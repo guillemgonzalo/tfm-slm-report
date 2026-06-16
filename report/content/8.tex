@@ -1,0 +1,102 @@
+\section{Infraestructura Cloud y Análisis de Costes}
+\label{sec:infraestructura}
+
+Uno de los pilares de este trabajo es la demostración de la viabilidad económica del proyecto mediante el uso de infraestructura cloud optimizada y automatizada. La arquitectura de hardware seleccionada no solo responde a necesidades de rendimiento, sino que se integra en un flujo de despliegue continuo donde la intervención humana es mínima.
+
+\subsection{Ecosistema AWS: Provisión de Recursos}
+Para el despliegue del entorno de entrenamiento, se ha seleccionado Amazon Web Services (AWS) debido a su madurez en servicios de computación acelerada y su capacidad de ofrecer recursos de alto rendimiento bajo demanda.
+
+\subsubsection{Repositorio de Imágenes: Amazon ECR}
+Amazon Elastic Container Registry (ECR) actúa como el repositorio privado del proyecto. Se ha integrado en el flujo de CI/CD para almacenar las imágenes Docker del modelo tfm-slm, etiquetadas dinámicamente con el SHA del commit para garantizar la trazabilidad entre el código fuente y el binario desplegado.
+
+\subsection{Selección del Hardware: Familia G6 y NVIDIA L4}
+La elección de la potencia de cómputo es el factor determinante en el tiempo de entrenamiento de un Small Language Model. AWS ofrece diversas familias de instancias optimizadas para computación acelerada, cada una con un hardware GPU específico diseñado para distintos casos de uso.
+
+\subsubsection{Comparativa de Familias de Aceleración}
+Como se detalla en la Tabla \ref{tab:aws_instances}, existen opciones que van desde la inferencia ligera (G4dn) hasta el entrenamiento masivo de LLMs (P5). Para este proyecto, se ha seleccionado la familia \textbf{G6} por su equilibrio óptimo entre capacidad de VRAM (24 GB) y coste operativo en modalidad Spot.
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{|l|X|l|}
+\hline
+\textbf{Instancia} & \textbf{Hardware GPU} & \textbf{Propósito Principal} \\ \hline
+\texttt{G4dn} & NVIDIA T4 (16 GB VRAM) & Inferencia y entrenamiento ligero \\ \hline
+\texttt{G5} & NVIDIA A10G (24 GB VRAM) & Entrenamiento de modelos SLM / Gráficos \\ \hline
+\texttt{G6} & NVIDIA L4 (24 GB VRAM) & Eficiencia energética y IA generativa \\ \hline
+\texttt{G6e} & NVIDIA L40S (48 GB VRAM) & Fine-tuning de LLMs de tamaño medio \\ \hline
+\texttt{G7e} & NVIDIA RTX PRO 6000 Server (96 GB VRAM) & Entrenamiento de LLMs y SLMs de alta capacidad \\ \hline
+\texttt{P4 / P5} & NVIDIA A100 / H100 & Cómputo de alto rendimiento (HPC) \\ \hline
+\end{tabularx}
+\caption{Ecosistema de aceleradores NVIDIA disponibles en AWS EC2.}
+\label{tab:aws_instances}
+\end{table}
+
+\subsubsection{Arquitectura NVIDIA Ada Lovelace en G6}
+La instancia seleccionada, \texttt{g6.2xlarge}, cuenta con un acelerador \textbf{NVIDIA L4}. Esta GPU de la familia Ada Lovelace destaca por sus núcleos Tensor de cuarta generación, soporte nativo de \textit{bfloat16} y 24 GB de VRAM GDDR6, siendo especialmente eficiente energéticamente respecto a generaciones anteriores de VRAM equivalente como la A10G.
+
+\subsection{Gestión de Infraestructura mediante Terraform}
+Para garantizar la reproducibilidad del entorno, se ha implementado una arquitectura de \textbf{Infraestructura como Código (IaC)} utilizando Terraform. Toda la configuración reside en el directorio \texttt{app/terraform/}, lo que permite levantar el entorno completo de forma automática.
+
+\subsubsection{Automatización y Prerrequisitos}
+Gracias a la automatización implementada, el único requisito manual para el despliegue es la existencia de una clave SSH (\textit{Key Pair}) denominada \texttt{tfm-slm} en la cuenta de AWS. El resto del proceso está codificado y es totalmente transparente para el desarrollador:
+\begin{itemize}
+    \item \textbf{Selección de AMI:} Se utiliza la \textit{Deep Learning Base AMI} (Figura \ref{fig:aws_ami}) para garantizar un sistema operativo con drivers NVIDIA y CUDA preinstalados.
+    \item \textbf{Provisionamiento Spot:} Terraform solicita la instancia buscando el menor coste en la región de España (\texttt{eu-south-2}).
+    \item \textbf{Orquestación del Arranque:} Mediante scripts de \textit{User Data}, la instancia se auto-configura al arrancar, instalando el motor Docker y lanzando el entrenamiento sin intervención manual.
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{images/aws_infrastructure/AMI.png}
+    \caption{Selección automatizada de la AMI especializada para Deep Learning mediante Terraform.}
+    \label{fig:aws_ami}
+\end{figure}
+
+\subsection{Optimización de Memoria: Batching y Aprovechamiento de VRAM}
+Con el hardware desplegado, se procede a ajustar el software para aprovechar los 24 GB de la NVIDIA L4.
+
+\subsubsection{Estrategia de Gradient Accumulation}
+Se utiliza la técnica de acumulación para simular lotes grandes sin saturar la VRAM. La Tabla \ref{tab:training_configs} resume la evolución desde el error inicial hasta la configuración óptima alcanzada durante las pruebas de estrés. La configuración conservadora (batch 4, acumulación 8) resultó estable pero lenta, mientras que la configuración optimizada (batch 16, acumulación 2) alcanzó un 97\% de utilización de la GPU manteniendo la estabilidad del entrenamiento.
+
+\begin{table}[H]
+    \centering
+    \begin{tabularx}{\textwidth}{|l|c|c|c|X|}
+        \hline
+        \textbf{Configuración} & \textbf{Batch Físico} & \textbf{Acumulación} & \textbf{Batch Efectivo} & \textbf{Resultado} \\ \hline
+        Base                   & 32                    & 1                    & 32                      & Error OOM (Falla)  \\ \hline
+        Conservadora           & 4                     & 8                    & 32                      & Estable (Lento)    \\ \hline
+        Optimizada             & 16                    & 2                    & 32                      & Punto óptimo (97\% Util.) \\ \hline
+    \end{tabularx}
+    \caption{Ajustes de memoria para maximizar el uso de la GPU NVIDIA L4.}
+    \label{tab:training_configs}
+\end{table}
+
+\subsection{Evaluación de Rendimiento vs Coste}
+
+La combinación de la arquitectura híbrida Transformer-GRU con la optimización de batching descrita en la sección anterior permitió alcanzar un 97\% de utilización de la GPU NVIDIA L4 con un coste de instancia Spot inferior a 0,50 USD/hora en la región \texttt{eu-south-2}. Esta relación rendimiento/coste es la que valida la hipótesis central del trabajo: es posible entrenar un SLM competitivo sin infraestructura masiva.
+
+\subsection{Mejoras Iterativas de la Arquitectura durante el Entrenamiento}
+
+A lo largo del proceso de entrenamiento se identificaron y corrigieron limitaciones de la arquitectura inicial mediante un ciclo de desarrollo iterativo. Las mejoras se aplicaron de forma incremental, validando el impacto de cada cambio sobre la estabilidad del entrenamiento y las métricas de calidad.
+
+\subsubsection{Persistent GRU Hidden States}
+En la implementación inicial, el estado oculto del GRU se descartaba al final de cada bloque, haciendo que la capa recurrente se comportara de forma \textit{stateless}. Se implementaron \textbf{estados ocultos persistentes} que fluyen a través de las 12 capas del modelo, manteniendo un tensor de estados compartido durante toda la secuencia de forward pass. Este cambio convirtió el GRU en un componente verdaderamente recurrente con memoria vertical entre bloques.
+
+\subsubsection{Posicionamiento Pre-Attention del GRU}
+Se modificó el orden de procesamiento dentro del bloque híbrido: el GRU ahora procesa la entrada \textbf{antes} que el mecanismo de atención. El nuevo orden (GRU → MHA → MLP) permite que la capa recurrente capture primero los patrones locales y secuenciales, entregando a la atención una representación ya refinada para la captura de dependencias globales. Esta inversión mejora la especialización de cada componente y reduce la redundancia entre ambos mecanismos.
+
+\subsubsection{Inicialización Ortogonal}
+Los pesos de entrada (\texttt{weight\_ih}) y recurrentes (\texttt{weight\_hh}) del GRU se inicializan mediante \textbf{inicialización ortogonal}, que garantiza que la matriz de pesos sea una isometría en el espacio vectorial. Esta técnica preserva la norma de los gradientes durante las primeras épocas de entrenamiento, reduciendo el riesgo de gradientes explosivos o en desaparición en la parte recurrente de la red.
+
+\subsubsection{Gradient Clipping}
+Se implementó \textit{clipping} de gradientes con norma máxima \texttt{grad\_clip\_norm = 1.0}. El clipping se aplica después de cada \textit{backward pass} y antes del paso del optimizador: si la norma $L_2$ del vector de gradientes supera el umbral, todos los gradientes se escalan proporcionalmente hacia abajo. Esta técnica es especialmente crítica en arquitecturas con componentes recurrentes, donde los gradientes pueden acumularse de forma multiplicativa a lo largo de la secuencia.
+
+\subsubsection{Component Contribution Logging}
+Se desarrolló una herramienta de análisis (\texttt{analyzer.py}) que mide y reporta el \textbf{ratio de contribución} de cada componente del bloque híbrido (GRU, Attention y MLP) durante el entrenamiento. Esta herramienta proporciona visibilidad directa sobre si el modelo está aprendiendo a utilizar ambos mecanismos de forma balanceada o si uno domina al otro, permitiendo detectar degeneraciones tempranas antes de que afecten a las métricas de validación.
+
+\subsubsection{Validation Loop}
+Se añadió un bucle de validación periódico que evalúa el modelo sobre un subconjunto de datos no visto durante el entrenamiento. La ejecución del loop de validación se intercala con el entrenamiento cada $N$ pasos, permitiendo detectar sobreajuste (\textit{overfitting}) en tiempo real y aplicar \textit{early stopping} si la perplejidad de validación deja de mejorar.
+
+\subsection{Evolución del Hardware: Migración a G7e}
+
+Las optimizaciones de software descritas en las secciones anteriores exprimen al máximo los 24 GB de VRAM de la NVIDIA L4. Sin embargo, modelos de mayor capacidad o secuencias más largas requieren dar el siguiente paso en la jerarquía de hardware. La familia \textbf{G7e}, equipada con la \textbf{NVIDIA RTX PRO 6000 Server} (96 GB VRAM), representa la evolución natural para este proyecto: cuadruplica la memoria disponible manteniendo la misma arquitectura de despliegue basada en Terraform y Docker, sin cambios en el pipeline de entrenamiento. Esta migración está prevista como línea de trabajo futuro para explorar configuraciones de mayor escala (más capas, mayor \textit{hidden size} o contextos de 4096 tokens) sin modificar la arquitectura híbrida base.

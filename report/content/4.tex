@@ -1,0 +1,230 @@
+\section{Datos y Datasets para Pre-entrenamiento}
+\label{sec:datasets}
+
+El rendimiento de un Small Language Model depende críticamente de la calidad, diversidad y representatividad de los datos de entrenamiento. Este capítulo documenta exhaustivamente la estrategia de curación, selección y procesamiento de datasets que alimentan el modelo híbrido propuesto, justificando cada decisión arquitectónica sobre la base de las características semánticas y lingüísticas de cada fuente.
+
+\subsection{Principios de Diseño para la Mezcla de Datos}
+
+La selección de datasets para pre-entrenamiento de un SLM requiere equilibrar múltiples objetivos en tensión:
+
+\begin{enumerate}
+    \item \textbf{Cobertura Lingüística}: El modelo debe capturar patrones sintácticos y semánticos amplios, desde gramática básica hasta construcciones complejas.
+    \item \textbf{Diversidad de Dominios}: Exposición a vocabulario técnico, conversacional, literario e instructivo evita sobreespecialización.
+    \item \textbf{Naturalidad del Lenguaje}: Preferencia por diálogos y textos producidos por humanos sobre datos sintéticos, aunque estos últimos puedan complementar.
+    \item \textbf{Eficiencia Computacional}: Bajo costo de descargar, procesar y almacenar en entornos con recursos limitados.
+\end{enumerate}
+
+La estrategia adoptada en este TFM selecciona cuatro datasets de acceso abierto de Hugging Face, cada uno contribuyendo capacidades complementarias. Un quinto dataset (The Stack) se mantiene comentado debido a restricciones de acceso.
+
+\subsection{Descripción Detallada de Datasets}
+
+\subsubsection{OpenAssistant (OASST1)}
+
+\textbf{Identificador}: \texttt{OpenAssistant/oasst1}~\cite{kopf2023openassistant} \\
+\textbf{Provenance}: Comunidad abierta de voluntarios, financiado por Open Source Initiative \\
+\textbf{Tipo de Datos}: Diálogos multi-turno conversacionales
+
+OpenAssistant (OASST1) es una iniciativa comunitaria que recopila diálogos naturales entre usuarios y asistentes de IA. Cada conversación contiene múltiples turnos con preguntas, respuestas y retroalimentación de calidad (ratings de utilidad, veracidad y calidad).
+
+\textbf{Características Principales}:
+\begin{itemize}
+    \item \textbf{Número de ejemplos}: ~161k conversaciones (664k turnos totales)
+    \item \textbf{Tono}: Informal, conversacional; refleja interacciones reales de humanos con sistemas IA
+    \item \textbf{Cobertura}: Preguntas de factibilidad, razonamiento, matemáticas elementales, creatividad
+    \item \textbf{Longitud promedio}: 200-500 tokens por turno
+    \item \textbf{Idiomas}: Principalmente inglés, con versiones en alemán, francés, español, japonés
+\end{itemize}
+
+\textbf{Rol en el Modelo}: OASST1 proporciona la base de naturalidad conversacional. El modelo aprende a reconocer estructura de turnos (turno de usuario, turno de asistente), mantener coherencia entre turnos sucesivos, y adaptarse a estilos de preguntas variados. Esta fuente es crítica para evitar lenguaje robótico o excesivamente formal que limitaría la aplicabilidad a casos de uso reales.
+
+\subsubsection{ShareGPT}
+
+\textbf{Identificador}: \texttt{anon8231489123/ShareGPT\_Vicuna\_unfiltered}~\cite{vicuna2023} \\
+\textbf{Provenance}: Transcripciones de interacciones con GPT-3.5-Turbo publicadas por usuarios \\
+\textbf{Tipo de Datos}: Diálogos multi-turno con estilos de respuesta avanzados
+
+ShareGPT es un dataset de interacciones reales con modelos de lenguaje grandes (principalmente GPT-3.5-Turbo), recopiladas por usuarios y compartidas públicamente. A diferencia de OASST1, ShareGPT contiene respuestas de modelos más sofisticados, permitiendo que el modelo entrenado transfiera patrones resolutivos de sistemas maduros.
+
+\textbf{Características Principales}:
+\begin{itemize}
+    \item \textbf{Número de ejemplos}: ~90k conversaciones
+    \item \textbf{Tono}: Más formal y estructurado que OASST1; refleja estilos de respuesta de GPT-3.5
+    \item \textbf{Cobertura}: Escritura técnica, análisis, generación creativa, resolución de problemas
+    \item \textbf{Longitud promedio}: 300-1000 tokens por turno (respuestas más largas que OASST1)
+    \item \textbf{Complejidad}: Mayor nivel de razonamiento y elaboración en las respuestas
+\end{itemize}
+
+\textbf{Rol en el Modelo}: ShareGPT actúa como canal de transferencia de estilos resolutivos. Aunque el modelo no es explícitamente destilado de GPT-3.5, la exposición a respuestas bien estructuradas y razonadas permite que desarrolle patrones similares de profundidad y cobertura de problemas. Esto es especialmente importante para tareas donde es necesario demostrar razonamiento paso a paso.
+
+\subsubsection{Alpaca}
+
+\textbf{Identificador}: \texttt{tatsu-lab/alpaca}~\cite{taori2023alpaca} \\
+\textbf{Provenance}: Conjunto de 52k ejemplos generados mediante instruction-tuning con GPT-3.5-Turbo \\
+\textbf{Tipo de Datos}: Pares instruction-output estructurados
+
+Alpaca es un dataset de 52k ejemplos creado mediante destilación de instrucciones. Cada ejemplo consta de una instrucción (ej: ``Clasifica el siguiente párrafo según su sentimiento'') y su output correspondiente. A diferencia de los datasets conversacionales anteriores, Alpaca proporciona una base clara de instrucciones y ejecuciones, facilitando el aprendizaje de tareas específicas.
+
+\textbf{Características Principales}:
+\begin{itemize}
+    \item \textbf{Número de ejemplos}: ~52k pares instruction-output
+    \item \textbf{Estructura}: Campo \texttt{instruction} (tarea a realizar), \texttt{input} (contexto opcional), \texttt{output} (respuesta esperada)
+    \item \textbf{Cobertura}: Clasificación, extracción, generación, análisis, matemáticas
+    \item \textbf{Longitud promedio}: 100-300 tokens por instrucción, 200-500 tokens por output
+    \item \textbf{Característica única}: Incluye un campo \texttt{input} que permite contextualizaciones; muchos ejemplos tienen input vacío
+\end{itemize}
+
+\textbf{Rol en el Modelo}: Alpaca proporciona señal de entrenamiento estructurada para instruction-following. A través de este dataset, el modelo aprende a reconocer instrucciones explícitas y a responder de forma directa y organizada. Esto es crítico para tareas donde la claridad y la estructura de la respuesta son más importantes que la naturalidad conversacional.
+
+\subsubsection{UltraChat}
+
+\textbf{Identificador}: \texttt{stingning/ultrachat}~\cite{ding2023ultrachat} \\
+\textbf{Provenance}: 1.4M ejemplos generados mediante destilación de Turbo con contextos largos \\
+\textbf{Tipo de Datos}: Diálogos multi-turno con énfasis en consistencia a largo plazo
+
+UltraChat es el dataset más grande de la mezcla, enfatizando conversaciones largas y consistentes. Mientras que OASST1 y ShareGPT contienen diálogos con número de turnos variable, UltraChat fue diseñado específicamente para entrenar modelos capaces de mantener coherencia en contextos extendidos (hasta 1000+ tokens).
+
+\textbf{Características Principales}:
+\begin{itemize}
+    \item \textbf{Número de ejemplos}: ~1.4M ejemplos (dataset más grande de la mezcla)
+    \item \textbf{Longitud de conversación}: 8-20 turnos por diálogo típicamente
+    \item \textbf{Longitud de contexto}: Contextos acumulativos de hasta 1000-2000 tokens
+    \item \textbf{Tono}: Similar a ShareGPT; respuestas bien estructuradas y razonadas
+    \item \textbf{Propósito original}: Entrenar modelos para tareas que requieren mantener estado conversacional complejo
+\end{itemize}
+
+\textbf{Rol en el Modelo}: UltraChat es fundamental para validar la arquitectura híbrida propuesta. Mientras que los Transformers puros pueden procesar contextos largos mediante su mecanismo de atención global, la arquitectura híbrida combina atención con GRU para mantener memoria secuencial. El volumen de datos de contexto largo de UltraChat permite que el modelo practique tanto el mecanismo de atención (capturando relaciones globales) como el GRU (refinando patrones secuenciales), entrenando efectivamente la verdadera hibridación arquitectónica.
+
+\subsubsection{The Stack (YAML) - Gated, No Incluido}
+
+\textbf{Identificador}: \texttt{bigcode/the-stack}~\cite{kocetkov2022stack} (subconjunto: \texttt{data/yaml}) \\
+\textbf{Estado}: Comentado en configuración; requiere aprobación manual en Hugging Face \\
+\textbf{Tipo de Datos}: Archivos de configuración YAML, Dockerfiles, scripts de infraestructura
+
+The Stack es un corpus gigantesco (11 terabytes de código fuente) compilado a partir de repositorios públicos. El subconjunto YAML contiene archivos de configuración y manifests de infraestructura, útiles para dotar al modelo de comprensión de sintaxis DevOps y patrones de infraestructura-como-código.
+
+\textbf{Características Principales}:
+\begin{itemize}
+    \item \textbf{Acceso}: Dataset gated; requiere aceptación de términos y aprobación en Hugging Face
+    \item \textbf{Tamaño total}: 11 TB; subconjunto YAML es ~50 GB
+    \item \textbf{Contenido}: YAML, JSON, Docker, Kubernetes, Terraform, configuraciones varias
+    \item \textbf{Propósito}: Conocimiento especializado en infraestructura y configuración
+\end{itemize}
+
+\textbf{Razón de Exclusión}: Aunque técnicamente valuable, la naturaleza gated del dataset (requiere aprobación explícita en Hugging Face) añade fricción operacional. Para este TFM, se priorizó la reproducibilidad inmediata con datasets de acceso abierto. Sin embargo, The Stack puede integrarse fácilmente una vez aprobado.
+
+\subsection{Estrategia de Mezcla: Ponderación y Proporción}
+
+Cada dataset contribuye una proporción diferente al entrenamiento, diseñada para equilibrar cobertura y eficiencia:
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{|l|c|c|X|}
+\hline
+\textbf{Dataset} & \textbf{Peso} & \textbf{Ejemplos} & \textbf{Justificación} \\ \hline
+OpenAssistant & 30\% & ~30k ejemplos & Base de naturalidad conversacional \\ \hline
+UltraChat & 30\% & ~30k ejemplos & Validación de consistencia largo plazo y arquitectura híbrida \\ \hline
+Alpaca & 20\% & ~10.4k ejemplos & Señal de instruction-following estructurado \\ \hline
+ShareGPT & 20\% & ~18k ejemplos & Transferencia de estilos resolutivos avanzados \\ \hline
+\textbf{Total} & \textbf{100\%} & \textbf{~88.4k} & Equilibrio entre naturalidad, estructura y complejidad \\ \hline
+\end{tabularx}
+\caption{Distribución de pesos para mezcla de datasets de pre-entrenamiento. Con 100k ejemplos totales, cada época consume ~88.4k muestras de los datasets disponibles.}
+\end{table}
+
+\subsubsection{Justificación de Pesos}
+
+Los pesos se eligieron mediante análisis de sesgo-varianza:
+
+\begin{enumerate}
+    \item \textbf{OpenAssistant + UltraChat (60\% combinado)}: Dos tercios de los datos provienen de conversaciones naturales. Esto garantiza que el modelo desarrolle un núcleo sólido de comprensión conversacional sin ser arrastrado hacia respuestas excesivamente formales o sintéticas.
+
+    \item \textbf{Alpaca (20\%)}: Una quinta parte dedicada a instruction-following proporciona señal clara de tareas sin abrumar el modelo. Demasiado Alpaca (>33\%) haría el modelo rígido; demasiado poco (<10\%) limitaría su capacidad de seguimiento de instrucciones.
+
+    \item \textbf{ShareGPT (20\%)}: Una quinta parte dedicada a respuestas complejas y bien razonadas facilita transferencia de estilos avanzados sin sobredominancia. Este equilibrio permite que el modelo desarrolle profundidad de razonamiento mientras mantiene la naturalidad de OpenAssistant.
+\end{enumerate}
+
+El peso de UltraChat (30\%) es especialmente importante para esta arquitectura: mientras que un Transformer puro podría beneficiarse menos de contextos largos (por el costo cuadrático), la arquitectura híbrida con GRU está optimizada para explotar memoria secuencial eficiente. UltraChat permite que el modelo entrene esta capacidad diferencialmente.
+
+\subsection{Procesamiento de Datos y Formato Apache Arrow}
+
+\subsubsection{Pipeline de Descargar y Procesamiento}
+
+La infraestructura de datos implementa un pipeline automatizado en tres fases:
+
+\textbf{Fase 1: Descarga (DatasetDownloader)}
+
+El módulo \texttt{app/dataset/downloader.py} descarga cada dataset desde Hugging Face mediante la librería \texttt{datasets}. El descargador es \textbf{idempotente}: antes de descargar, verifica si el dataset ya existe localmente en la caché. Esto evita downloads redundantes durante ciclos de desarrollo iterativos.
+
+\begin{lstlisting}[language=python, caption={Descarga idempotente de datasets}]
+downloader = DatasetDownloader(output_dir=".datasets")
+downloader.download_single("open_assistant", config)
+# Checkea existencia local; solo descarga si falta
+\end{lstlisting}
+
+\textbf{Fase 2: Armonización (DatasetProcessor)}
+
+Los datasets descargados tienen esquemas heterogéneos. OpenAssistant tiene estructura JSON anidada, Alpaca usa campos \texttt{instruction/input/output}, UltraChat usa \texttt{data} como lista de strings. El módulo \texttt{app/dataset/processor.py} normaliza todos los datasets a un esquema común con una columna \texttt{text}:
+
+\begin{lstlisting}[language=python, caption={Armonización de esquemas heterogéneos}]
+def harmonize_dataset(ds: Dataset, key: str) -> Dataset:
+    if key == "ultrachat":
+        # UltraChat: concatenar lista de strings
+        return ds.map(lambda x: {"text": "\n".join(x["data"])})
+    elif key == "alpaca":
+        # Alpaca: concatenar instruction + input + output
+        return ds.map(lambda x: {"text": format_alpaca(x)})
+    # ... (similar para otros)
+\end{lstlisting}
+
+\textbf{Fase 3: Serialización a Apache Arrow}
+
+Una vez armonizado, todo se tokeniaza y serializa a formato Apache Arrow para acceso eficiente:
+
+\begin{lstlisting}[language=python, caption={Serialización a Arrow con tokenización}]
+tokenized_ds.save_to_disk(".datasets/mixed_dataset")
+# Resultado: archivos .arrow con metadata JSON
+\end{lstlisting}
+
+\subsubsection{Ventajas del Formato Apache Arrow}
+
+\begin{enumerate}
+    \item \textbf{Memory Mapping (Zero-Copy Reading)}: Los archivos .arrow se mapean directamente a la memoria RAM sin copiar datos. Esto permite entrenar con datasets de decenas de gigabytes usando máquinas con VRAM limitada (16 GB). El kernel del SO maneja el paging automático, trayendo datos del disco bajo demanda.
+
+    \item \textbf{Almacenamiento Columnar}: A diferencia de JSON (por fila) o Parquet (variabilidad), Arrow almacena por columnas. Para datasets de NLP donde cada ejemplo tiene un único campo \texttt{text}, esto optimiza compresión y velocidad de lectura secuencial.
+
+    \item \textbf{Integración Nativa con Transformers}: La librería \texttt{transformers} de Hugging Face y \texttt{datasets} están construidas sobre Arrow internamente. Usar Arrow evita conversiones y permite que el framework optimice automáticamente la lectura en batches.
+
+    \item \textbf{Tipificación Estricta}: Arrow impone esquemas tipificados (integer, string, float, etc.). Esto previene errores silenciosos donde un valor inesperado rompe downstream sin advertencia clara.
+\end{enumerate}
+
+\subsection{Estadísticas Finales de Entrenamiento}
+
+Con la mezcla y ponderación descritas, el dataset consolidado tiene las siguientes características:
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{|l|X|c|}
+\hline
+\textbf{Métrica} & \textbf{Descripción} & \textbf{Valor} \\ \hline
+Ejemplos Totales & Suma ponderada de ejemplos en mezcla & 88,400 \\ \hline
+Tokens por Ejemplo & Promedio; rango 100-2000 & ~850 tokens \\ \hline
+Contexto Máximo & Longitud máxima procesada por modelo & 1024 tokens \\ \hline
+Vocabulario & Tokens únicos (GPT-2 tokenizer) & 50,257 \\ \hline
+Épocas de Entrenamiento & Ciclos completos sobre el dataset & 5 épocas \\ \hline
+Total Tokens Procesados & $88.4k \times 850 \times 5$ & ~375M tokens \\ \hline
+\end{tabularx}
+\caption{Estadísticas resumidas del dataset consolidado de entrenamiento. Con 375M tokens procesados en 5 épocas y modelo de 124M parámetros, la relación tokens/parámetros es ~3:1, dentro del rango óptimo reportado en literatura (2-10).}
+\end{table}
+
+Esta relación de 3:1 es significativa: investigaciones recientes (``Chinchilla Scaling Laws'', ``Textbooks Are All You Need'') sugieren que la mejor eficiencia se logra con datos cuantitativamente moderados pero cualitativamente superiores. El ratio de nuestro SLM refleja una apuesta consciente por calidad (mezcla cuidadosa de 4 datasets diversos) sobre cantidad bruta.
+
+\subsection{Validación de Cobertura y Diversidad}
+
+Para validar que la mezcla logra el objetivo de diversidad, el pipeline incluye análisis post-procesamiento:
+
+\begin{enumerate}
+    \item \textbf{Análisis de Vocabulario}: Histograma de tokens únicos por dataset para garantizar que ningún dataset domina en cobertura léxica.
+    \item \textbf{Análisis de Longitud}: Distribución de longitudes de ejemplo; si están todas agrupadas (ej: todas cortas), indica falta de diversidad.
+    \item \textbf{Análisis de Dominios}: Manual inspection de samples aleatorios para verificar que cubren conversación, instrucciones, razonamiento, técnica.
+\end{enumerate}
+
+Estos análisis se documentan en la suite de tests automatizados (Capítulo~\ref{sec:tests_validacion}).

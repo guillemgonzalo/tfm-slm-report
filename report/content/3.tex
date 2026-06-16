@@ -1,0 +1,80 @@
+\section{Fundamentos Teóricos}
+\label{sec:fundamentos}
+
+En este capítulo se formalizan matemáticamente las tecnologías base que componen la propuesta híbrida. El objetivo es doble: por un lado, establecer el lenguaje técnico preciso que se utilizará en los capítulos de implementación y evaluación; por otro, justificar mediante análisis de complejidad la elección de una arquitectura mixta frente a los enfoques puros predominantes en la industria.
+
+% ---------------------------------------------------------------
+\subsection{El Mecanismo de Atención}
+
+El mecanismo de \textit{self-attention}, introducido por Vaswani et al.~\cite{vaswani2017attention}, opera sobre una secuencia de $L$ vectores de entrada $X \in \mathbb{R}^{L \times d_{model}}$, proyectándolos en tres espacios distintos mediante matrices aprendibles:
+
+\begin{equation}
+    Q = X W_Q, \quad K = X W_K, \quad V = X W_V
+\end{equation}
+
+donde $W_Q, W_K, W_V \in \mathbb{R}^{d_{model} \times d_k}$ son las matrices de proyección para \textit{queries}, \textit{keys} y \textit{values} respectivamente. La salida de atención se obtiene como:
+
+\begin{equation}
+    \text{Attention}(Q, K, V) = \text{softmax}\!\left(\frac{QK^\top}{\sqrt{d_k}}\right) V
+\end{equation}
+
+El factor de escala $\frac{1}{\sqrt{d_k}}$ previene que el producto interior $QK^\top$ crezca en magnitud con la dimensión, evitando regiones de gradiente muy pequeño en la función softmax. La matriz resultante $QK^\top \in \mathbb{R}^{L \times L}$ es el núcleo del problema de escalabilidad: su cómputo requiere $O(L^2)$ operaciones y su almacenamiento $O(L^2)$ memoria, lo que limita severamente el procesamiento de contextos largos en entornos con VRAM reducida.
+
+% ---------------------------------------------------------------
+\subsection{Multi-Head Attention}
+
+El mecanismo de \textit{Multi-Head Attention} (MHA) extiende la atención simple ejecutando $h$ cabezas en paralelo, cada una con sus propias proyecciones de dimensión reducida $d_k = d_{model}/h$:
+
+\begin{equation}
+    \text{MHA}(Q, K, V) = \text{Concat}(\text{head}_1, \ldots, \text{head}_h)\, W_O
+\end{equation}
+
+\begin{equation}
+    \text{head}_i = \text{Attention}(Q W_{Q_i},\, K W_{K_i},\, V W_{V_i})
+\end{equation}
+
+En el modelo propuesto se utilizan $h = 12$ cabezas sobre un espacio de $d_{model} = 768$ dimensiones, resultando en $d_k = 64$ por cabeza. Esta configuración captura relaciones semánticas a distintos niveles de abstracción simultáneamente, desde co-referencias pronominales hasta dependencias sintácticas de largo alcance.
+
+% ---------------------------------------------------------------
+\subsection{Gated Recurrent Units (GRU)}
+
+Las \textit{Gated Recurrent Units}~\cite{cho2014learning} son una variante simplificada de las LSTM~\cite{hochreiter1997lstm} diseñada para reducir el número de puertas sin sacrificar capacidad de memoria selectiva. Dado un token de entrada $x_t$ y el estado oculto anterior $h_{t-1}$, el GRU computa:
+
+\begin{align}
+    z_t &= \sigma(W_z x_t + U_z h_{t-1} + b_z) & \text{(puerta de actualización)} \\
+    r_t &= \sigma(W_r x_t + U_r h_{t-1} + b_r) & \text{(puerta de reinicio)} \\
+    \tilde{h}_t &= \tanh(W_h x_t + U_h (r_t \odot h_{t-1}) + b_h) & \text{(candidato de estado)} \\
+    h_t &= (1 - z_t) \odot h_{t-1} + z_t \odot \tilde{h}_t & \text{(estado oculto)}
+\end{align}
+
+donde $\sigma$ es la función sigmoide y $\odot$ denota el producto elemento a elemento. La \textbf{puerta de actualización} $z_t$ decide qué fracción del estado anterior se conserva; la \textbf{puerta de reinicio} $r_t$ controla cuánta información del pasado es relevante para computar el candidato $\tilde{h}_t$.
+
+\subsubsection{Justificación de GRU frente a LSTM}
+
+La elección de GRU sobre LSTM está motivada por criterios de eficiencia en parámetros: una celda GRU tiene dos puertas frente a las tres de una LSTM (más la celda de memoria $c_t$), lo que reduce el número de parámetros por unidad en aproximadamente un 25\%. Estudios empíricos como los de Chung et al.~\cite{chung2014empirical} demuestran que esta reducción no implica pérdida significativa de rendimiento en tareas de modelado del lenguaje cuando el estado oculto tiene dimensión suficiente. En el contexto de un SLM con recursos limitados, esta eficiencia es determinante.
+
+% ---------------------------------------------------------------
+\subsection{La Hipótesis Híbrida: Análisis de Complejidad}
+
+La motivación central de este trabajo es la superación del paradigma de \textit{``atención pura''} para modelos de escala reducida. La arquitectura híbrida propuesta se fundamenta en un análisis de complejidad comparativo entre los tres enfoques posibles:
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{|X|c|c|c|}
+\hline
+\textbf{Arquitectura} & \textbf{Memoria} & \textbf{Cómputo} & \textbf{Estado secuencial} \\ \hline
+Transformer puro & $O(L^2)$ & $O(L^2 d)$ & KV Cache (crece con $L$) \\ \hline
+RNN / GRU puro & $O(d)$ & $O(Ld^2)$ & Estado fijo $h \in \mathbb{R}^d$ \\ \hline
+\textbf{Híbrido (propuesto)} & $O(L^2 + d)$ & $O(L^2 d + Ld^2)$ & KV Cache + estado GRU \\ \hline
+\end{tabularx}
+\caption{Comparativa de complejidad computacional y de memoria.}
+\label{tab:complejidad}
+\end{table}
+
+El diseño híbrido no mejora la complejidad asintótica en el peor caso, pero ofrece ventajas prácticas relevantes para el rango de contextos cortos-medios ($L \leq 1024$) en los que opera este modelo:
+
+\begin{enumerate}
+    \item \textbf{Eficiencia de memoria por bloque:} el GRU actúa como un \textit{compresor de contexto}, manteniendo un estado interno fijo $h \in \mathbb{R}^d$ que resume el historial de la secuencia sin necesidad de almacenar las activaciones intermedias de todos los tokens anteriores.
+    \item \textbf{Separación de responsabilidades:} la atención captura dependencias globales de largo alcance, mientras el GRU modela la estructura secuencial local (orden de palabras, concordancia morfológica). Esta división evita que un único mecanismo deba resolver ambas escalas, reduciendo la carga efectiva de cada componente.
+    \item \textbf{Inferencia estable en contextos largos:} el estado oculto del GRU permanece acotado independientemente de $L$, proporcionando una representación del historial con latencia constante que complementa el KV Cache de atención.
+\end{enumerate}

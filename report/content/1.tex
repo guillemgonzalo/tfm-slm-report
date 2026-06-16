@@ -1,0 +1,77 @@
+\section{Introducción}
+\label{sec:introduccion}
+
+\subsection{Contexto y Motivación}
+
+Los Large Language Models (LLM) han transformado la inteligencia artificial moderna. Sin embargo, su desarrollo permanece concentrado en pocas organizaciones debido a costes prohibitivos: el entrenamiento de modelos de miles de millones de parámetros requiere infraestructura masiva y decenas de millones de dólares.
+
+Los Small Language Models (SLM) emergen como alternativa viable para organizaciones que requieren modelos controlables, eficientes y especializados. A diferencia de depender de APIs de terceros o servicios en la nube, desarrollar un SLM internamente permite:
+
+\begin{itemize}
+    \item Control total sobre datos y privacidad
+    \item Optimización para hardware disponible (GPUs consumer-grade)
+    \item Especialización en dominios específicos
+    \item Reducción de latencia y costes de inferencia
+\end{itemize}
+
+El desafío reside en diseñar arquitecturas que capturen las capacidades de modelos grandes manteniendo eficiencia computacional.
+
+\subsection{Problema y Propuesta}
+
+Los Transformers puros, aunque efectivos, requieren múltiples capas de atención para capturar patrones secuenciales, incrementando VRAM y latencia. Las arquitecturas recurrentes (RNN, GRU) son eficientes pero pierden contexto a largo plazo.
+
+Este trabajo propone una \textbf{arquitectura híbrida que combina Transformer Multi-Head Attention y capas GRU dentro de cada bloque}, permitiendo:
+
+\begin{itemize}
+    \item Captura de dependencias globales vía Multi-Head Attention
+    \item Refinamiento secuencial local vía GRU
+    \item Reducción de requisitos de VRAM respecto a Transformers puros equivalentes
+\end{itemize}
+
+\subsection{Objetivos}
+
+El objetivo principal es diseñar, implementar y validar esta arquitectura híbrida SLM, evaluando su rendimiento en términos absolutos y contextualizando los resultados respecto a la literatura publicada sobre modelos de escala comparable.
+
+\textbf{Objetivo 1 --- Pre-entrenamiento y Validación Arquitectónica:}
+\begin{itemize}
+    \item Implementación de la arquitectura híbrida con optimizaciones CUDA
+    \item Pre-entrenamiento desde cero sobre datasets conversacionales públicos (OpenAssistant, ShareGPT, Alpaca)
+    \item Evaluación cuantitativa mediante métricas estándar de modelado del lenguaje:
+    \begin{itemize}
+        \item Perplejidad (capacidad predictiva)
+        \item Peak VRAM (eficiencia de memoria)
+        \item Tokens/segundo (latencia de inferencia)
+        \item Precisión Top-1, Top-5 y Top-10
+    \end{itemize}
+\end{itemize}
+
+\textbf{Objetivo 2 --- Validación de Producción:}
+\begin{itemize}
+    \item Despliegue en Kubernetes con gestión automatizada mediante ArgoCD
+    \item Análisis de cost-benefit: AWS Spot Instances vs desarrollo local
+    \item Pipelines de testing automatizados para validación continua
+\end{itemize}
+
+\subsection{Contribuciones}
+
+\begin{enumerate}
+    \item \textbf{Arquitectura híbrida Transformer-GRU}: demostración de que la combinación de atención global y recurrencia local permite reducir la huella de memoria sin sacrificar capacidad predictiva
+    \item \textbf{Benchmark exhaustivo}: evaluación cuantitativa de 10 métricas sobre 300.000 muestras de validación, con análisis de estabilidad y contextualización respecto a la literatura
+    \item \textbf{Pipeline de ingeniería end-to-end}: implementación completa desde pre-entrenamiento hasta despliegue en producción, incluyendo infraestructura cloud y automatización de testing
+\end{enumerate}
+
+\subsection{Estructura del Documento}
+
+\begin{itemize}
+    \item \textbf{Capítulo 2}: Estado del arte --- evolución de LLM a SLM, RNN, LSTM, GRU, Transformers y arquitecturas híbridas modernas
+    \item \textbf{Capítulo 3}: Fundamentos teóricos --- formalización matemática del mecanismo de atención, MHA, GRU y análisis de complejidad híbrida
+    \item \textbf{Capítulo 4}: Datos y datasets --- descripción de los conjuntos de datos utilizados para el pre-entrenamiento
+    \item \textbf{Capítulo 5}: Mejoras arquitectónicas e implementación --- proceso iterativo de desarrollo y decisiones de ingeniería
+    \item \textbf{Capítulo 6}: Diseño e implementación de la arquitectura híbrida --- especificación técnica del modelo final
+    \item \textbf{Capítulo 7}: Evaluación y benchmarking --- 10 métricas de calidad, eficiencia y recursos sobre 300.000 muestras
+    \item \textbf{Capítulo 8}: Infraestructura cloud y análisis de costes --- provisión con Terraform, EC2, S3 y ECR
+    \item \textbf{Capítulo 9}: MLOps: despliegue y puesta en producción --- CI/CD, testing automatizado, Terraform y diseño GitOps con ArgoCD
+    \item \textbf{Capítulo 10}: Conclusiones y trabajo futuro
+    \item \textbf{Anexo A}: Guía rápida de comandos
+    \item \textbf{Anexo B}: Configuración del backend
+\end{itemize}

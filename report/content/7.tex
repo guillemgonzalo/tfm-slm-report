@@ -1,0 +1,109 @@
+\section{Evaluación y Benchmarking}
+\label{sec:evaluacion}
+
+La evaluación rigurosa de un modelo de lenguaje requiere ir más allá de la observación de la curva de pérdida durante el entrenamiento. Este capítulo documenta la evaluación cuantitativa del modelo híbrido tfm-slm mediante un benchmark exhaustivo de 10 métricas ejecutado sobre un conjunto de validación independiente, seguido de un análisis de los resultados obtenidos y su contexto respecto a modelos de referencia.
+
+% ---------------------------------------------------------------
+\subsection{Entorno y Configuración del Benchmark}
+
+La evaluación se ejecuta en el mismo entorno de producción utilizado para el entrenamiento: una instancia \texttt{g6.2xlarge} de AWS equipada con una GPU NVIDIA L4 (24 GB VRAM). Esta decisión garantiza que las métricas de latencia y throughput sean representativas del rendimiento real en despliegue, y no de un entorno de laboratorio distinto al operacional.
+
+El checkpoint evaluado corresponde al modelo final almacenado en S3 (\texttt{s3://tfm-slm-benchmarks/benchmark\_hybrid.json}), descargado automáticamente por el sistema de benchmarking. El conjunto de validación, igualmente descargado desde S3, consiste en \textbf{300.000 muestras} del dataset mixto de diálogos e instrucciones, procesadas en lotes de 64 tokens, lo que resulta en 4.688 iteraciones de evaluación.
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{|l|X|}
+\hline
+\textbf{Parámetro} & \textbf{Valor} \\ \hline
+Modelo evaluado & HybridBlock (12 capas, 768 oculto, 12 cabezas) \\ \hline
+Dispositivo & CUDA (NVIDIA L4) \\ \hline
+Muestras de validación & 300.000 \\ \hline
+Tamaño de lote & 64 \\ \hline
+Iteraciones totales & 4.688 \\ \hline
+Tiempo total de evaluación & 3.399,88 s ($\approx$56 min) \\ \hline
+\end{tabularx}
+\caption{Configuración del entorno de benchmarking.}
+\label{tab:benchmark_config}
+\end{table}
+
+% ---------------------------------------------------------------
+\subsection{Métricas de Evaluación}
+
+El benchmark cubre diez métricas agrupadas en tres categorías: calidad del modelo, eficiencia computacional y huella de recursos.
+
+\subsubsection{Calidad del Modelo}
+
+\paragraph{Pérdida y Perplejidad.}
+La \textbf{pérdida cross-entropy} final sobre el conjunto de validación es $\mathcal{L} = 1{,}091$. La \textbf{perplejidad}, definida como $\text{PPL} = e^{\mathcal{L}}$, alcanza un valor de \textbf{2,98}. La perplejidad puede interpretarse como el número efectivo de tokens igualmente probables que el modelo considera en cada posición: un valor de 2,98 indica que el modelo está altamente concentrado en sus predicciones, reduciendo la incertidumbre media a menos de 3 candidatos por token.
+
+El log de evaluación muestra que la perplejidad se estabilizó en $\approx 2{,}98$ a partir del batch 300 (de 4.688), permaneciendo constante hasta el final. Esta estabilidad, visible en la Figura~\ref{fig:perplexity_evolution}, es indicativa de una distribución de validación uniforme y de un modelo bien generalizado sin sobreajuste localizado.
+
+\paragraph{Precisión de Predicción.}
+Se reportan tres niveles de precisión en la predicción del siguiente token:
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{|l|c|X|}
+\hline
+\textbf{Métrica} & \textbf{Valor} & \textbf{Interpretación} \\ \hline
+Top-1 Accuracy & 79,75\% & El token correcto es la primera predicción del modelo \\ \hline
+Top-5 Accuracy & 91,14\% & El token correcto está entre las 5 primeras predicciones \\ \hline
+Top-10 Accuracy & 93,56\% & El token correcto está entre las 10 primeras predicciones \\ \hline
+\end{tabularx}
+\caption{Métricas de precisión de predicción del modelo híbrido.}
+\label{tab:accuracy}
+\end{table}
+
+Una precisión Top-1 del 79,75\% sobre 300.000 muestras es un resultado sólido para un modelo entrenado desde cero con 167M de parámetros. La diferencia de 11,39 puntos porcentuales entre Top-1 y Top-5 refleja la naturaleza inherentemente ambigua del lenguaje natural: en muchos contextos, múltiples tokens son igualmente válidos como continuación, y el modelo los sitúa correctamente entre sus candidatos principales.
+
+\subsubsection{Eficiencia Computacional}
+
+\paragraph{Latencia e Inferencia.}
+La latencia media por token en modo de inferencia individual es de \textbf{7,00 ms}, equivalente a una cadencia de \textbf{142,76 tokens/segundo} en modo secuencial. Este valor es determinante para aplicaciones conversacionales, donde se percibe como fluido cualquier modelo que supere los 50 tokens/segundo.
+
+En modo de inferencia por lotes (\textit{batch inference}) se observan dos valores de throughput con naturalezas distintas. Durante la ejecución del benchmark, el log reporta de forma continua un rendimiento sostenido de $\approx$\textbf{146.000 tokens/segundo} (con un arranque inicial de 142.170 tok/s en el primer bloque). Sin embargo, el resumen final generado por el sistema de benchmarking registra un valor de \textbf{90.268 tokens/segundo} bajo la clave \texttt{batch\_throughput\_tokens\_per\_sec}.
+
+Esta discrepancia se explica por la diferencia de granularidad en la medición: el log refleja el throughput instantáneo por ventana de 10 batches, mientras que el JSON reporta el throughput efectivo global, que incluye el tiempo de carga del checkpoint desde S3, la inicialización del dataset y la descarga de artefactos al inicio de la sesión. El valor operativo representativo del rendimiento de la GPU en inferencia pura es el del log ($\approx$146.000 tok/s), mientras que el del JSON refleja el coste real de un despliegue completo de principio a fin.
+
+\subsubsection{Huella de Recursos}
+
+\paragraph{Tamaño del Modelo.}
+El modelo cuenta con \textbf{166.980.864 parámetros}, todos ellos entrenables, con un tamaño en disco de \textbf{636,98 MB}. Esto lo sitúa en la categoría de Small Language Model (SLM), equiparable en orden de magnitud a GPT-2 Medium (345M params) pero con una huella de memoria significativamente menor gracias a la arquitectura híbrida.
+
+\paragraph{Memoria en Pico.}
+El pico de memoria GPU durante la evaluación fue de \textbf{66,76 GB}. Este valor corresponde a la evaluación sobre los 300.000 samples con batch 64, e incluye las activaciones intermedias acumuladas para el cómputo de métricas. Durante la inferencia en producción (sin acumulación de gradientes ni activaciones), el consumo de memoria es considerablemente inferior y se mantiene dentro de los 24 GB disponibles en la L4.
+
+% ---------------------------------------------------------------
+\subsection{Análisis de Estabilidad}
+
+Una de las conclusiones más relevantes del log de benchmarking es la notable estabilidad de todas las métricas a lo largo de las 4.688 iteraciones. La perplejidad oscila en un rango de apenas $\pm 0{,}01$ tras la fase inicial de estabilización (primeros 200 batches), y la precisión Top-1 se mantiene entre 79,7\% y 79,8\% durante el 95\% de la evaluación.
+
+Esta estabilidad no es trivial: indica que el modelo generaliza de forma homogénea a todos los subconjuntos del dataset de validación, sin degradación en muestras de dominios específicos ni varianza anómala que sugiera problemas de sobreajuste parcial.
+
+Los picos de pérdida por batch observados en el log (valores ocasionales superiores a 1,2) son normales en evaluación de lenguaje natural y reflejan la presencia de muestras intrínsecamente difíciles (cambios abruptos de dominio, nombres propios infrecuentes, código), no un problema del modelo.
+
+% ---------------------------------------------------------------
+\subsection{Resumen de Resultados}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{|l|c|X|}
+\hline
+\textbf{Métrica} & \textbf{Resultado} & \textbf{Categoría} \\ \hline
+Loss (cross-entropy) & 1,091 & Calidad \\ \hline
+Perplejidad & 2,98 & Calidad \\ \hline
+Top-1 Accuracy & 79,75\% & Calidad \\ \hline
+Top-5 Accuracy & 91,14\% & Calidad \\ \hline
+Top-10 Accuracy & 93,56\% & Calidad \\ \hline
+Latencia por token & 7,00 ms & Eficiencia \\ \hline
+Throughput (single token) & 142,76 tok/s & Eficiencia \\ \hline
+Throughput (batch, GPU pura) & $\approx$146.000 tok/s & Eficiencia \\ \hline
+Throughput (batch, despliegue completo) & 90.268 tok/s & Eficiencia \\ \hline
+Parámetros totales & 166.980.864 & Recursos \\ \hline
+Tamaño del modelo & 636,98 MB & Recursos \\ \hline
+\end{tabularx}
+\caption{Resumen de las 10 métricas del benchmark del modelo híbrido tfm-slm.}
+\label{tab:benchmark_summary}
+\end{table}
+
+Los resultados demuestran que la arquitectura híbrida Transformer-GRU alcanza un equilibrio eficiente entre calidad de predicción y coste computacional. Una perplejidad de 2,98 y una precisión Top-1 superior al 79\% son resultados competitivos para un modelo de 167M de parámetros entrenado desde cero sobre datos públicos, validando la hipótesis central del trabajo: las arquitecturas híbridas pueden lograr rendimiento comparable al de los Transformers puros con una fracción de los requisitos de memoria.

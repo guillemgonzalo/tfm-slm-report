@@ -1,0 +1,13 @@
+# Latex documentation
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.synctex.gz
+*.toc
+*.sum
+*.out
+*.bbl
+*.blg
+
+.DS_Store
