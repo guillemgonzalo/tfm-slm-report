@@ -1,0 +1,66 @@
+\markdownRendererDocumentBegin
+\markdownRendererWarning{The `hybrid` option has been soft-deprecated.}{The `hybrid` option has been soft-deprecated.}{Consider using one of the following better options for mixing TeX and markdown: `contentBlocks`, `rawAttribute`, `texComments`, `texMathDollars`, `texMathSingleBackslash`, and `texMathDoubleBackslash`. For more information, see the user manual at <https://witiko.github.io/markdown/>.}{Consider using one of the following better options for mixing TeX and markdown: `contentBlocks`, `rawAttribute`, `texComments`, `texMathDollars`, `texMathSingleBackslash`, and `texMathDoubleBackslash`. For more information, see the user manual at <https://witiko.github.io/markdown/>.}\markdownRendererSectionBegin
+\markdownRendererHeadingOne{Setup Backend: S3 para Código, Checkpoints y Estado de Terraform}\markdownRendererInterblockSeparator
+{}Ejecuta estos comandos \markdownRendererStrongEmphasis{una sola vez} en tu terminal local (Mac) para crear los recursos necesarios:\markdownRendererInterblockSeparator
+{}\markdownRendererUlBeginTight
+\markdownRendererUlItem Bucket para código (deploy.py sube aquí)\markdownRendererUlItemEnd 
+\markdownRendererUlItem Bucket para checkpoints (training guarda aquí)\markdownRendererUlItemEnd 
+\markdownRendererUlItem Bucket para estado de Terraform (terraform.tfstate)\markdownRendererUlItemEnd 
+\markdownRendererUlEndTight \markdownRendererInterblockSeparator
+{}\markdownRendererSectionBegin
+\markdownRendererHeadingTwo{Prerequisitos}\markdownRendererInterblockSeparator
+{}\markdownRendererInputFencedCode{./_markdown_main/541a4726ecfd93b6a95e32f87d93b3f6.verbatim}{bash}{bash}\markdownRendererInterblockSeparator
+{}
+\markdownRendererSectionEnd \markdownRendererSectionBegin
+\markdownRendererHeadingTwo{1. Crear Buckets S3 (Ejecutar Una Sola Vez)}\markdownRendererInterblockSeparator
+{}\markdownRendererSectionBegin
+\markdownRendererHeadingThree{1a. Bucket para Código (\markdownRendererCodeSpan{tfm-slm-code})}\markdownRendererInterblockSeparator
+{}Deploy.py archiva y sube el código aquí. EC2 lo descarga al iniciar.\markdownRendererInterblockSeparator
+{}\markdownRendererInputFencedCode{./_markdown_main/819a2986a9342841910644275232b3f3.verbatim}{bash}{bash}\markdownRendererInterblockSeparator
+{}
+\markdownRendererSectionEnd \markdownRendererSectionBegin
+\markdownRendererHeadingThree{1b. Bucket para Checkpoints (\markdownRendererCodeSpan{tfm-slm-checkpoints})}\markdownRendererInterblockSeparator
+{}Training guarda automáticamente checkpoints aquí después de cada época. Chat lo descarga si no está local.\markdownRendererInterblockSeparator
+{}\markdownRendererInputFencedCode{./_markdown_main/5bc6395d5045bc1c85ce78833eedd3a5.verbatim}{bash}{bash}\markdownRendererInterblockSeparator
+{}
+\markdownRendererSectionEnd \markdownRendererSectionBegin
+\markdownRendererHeadingThree{1c. Bucket para Datasets Procesados (\markdownRendererCodeSpan{tfm-slm-datasets})}\markdownRendererInterblockSeparator
+{}Dataset procesado (.arrow) se sube aquí tras primer procesado. Runs futuros lo restauran directamente — evita reprocesar ~700K samples.\markdownRendererInterblockSeparator
+{}\markdownRendererInputFencedCode{./_markdown_main/3438822bc8ed68d4ca68af73c29d1b61.verbatim}{bash}{bash}\markdownRendererInterblockSeparator
+{}
+\markdownRendererSectionEnd \markdownRendererSectionBegin
+\markdownRendererHeadingThree{1d. Bucket para Benchmarks (\markdownRendererCodeSpan{tfm-slm-benchmarks})}\markdownRendererInterblockSeparator
+{}Almacena resultados de benchmarking (métricas, perplexity, throughput) en JSON. Script \markdownRendererCodeSpan{tfm-slm-benchmark} sube automáticamente.\markdownRendererInterblockSeparator
+{}\markdownRendererInputFencedCode{./_markdown_main/a550cba7eab4c7661500494b433247fb.verbatim}{bash}{bash}\markdownRendererInterblockSeparator
+{}
+\markdownRendererSectionEnd \markdownRendererSectionBegin
+\markdownRendererHeadingThree{1e. Bucket para Estado Terraform (\markdownRendererCodeSpan{tfm-slm-terraform-state})}\markdownRendererInterblockSeparator
+{}Almacena \markdownRendererCodeSpan{terraform.tfstate} de forma centralizada (permite múltiples ejecuciones seguras).\markdownRendererInterblockSeparator
+{}\markdownRendererInputFencedCode{./_markdown_main/7507d9a0e7b3917e5d7af96c3c5c10a9.verbatim}{bash}{bash}\markdownRendererInterblockSeparator
+{}
+\markdownRendererSectionEnd 
+\markdownRendererSectionEnd \markdownRendererSectionBegin
+\markdownRendererHeadingTwo{2. Configurar Versionado (Backup de Estado)}\markdownRendererInterblockSeparator
+{}Habilita versionado en el bucket de estado para recuperar versiones anteriores si algo falla.\markdownRendererInterblockSeparator
+{}\markdownRendererInputFencedCode{./_markdown_main/042ba7e1caf2b885d8e6d0d28c94e3f8.verbatim}{bash}{bash}\markdownRendererInterblockSeparator
+{}
+\markdownRendererSectionEnd \markdownRendererSectionBegin
+\markdownRendererHeadingTwo{3. Validar Buckets Creados}\markdownRendererInterblockSeparator
+{}\markdownRendererInputFencedCode{./_markdown_main/bc412cce2f5e13a5b909e7aee0b4053e.verbatim}{bash}{bash}\markdownRendererInterblockSeparator
+{}\markdownRendererThematicBreak{}\markdownRendererInterblockSeparator
+{}
+\markdownRendererSectionEnd \markdownRendererSectionBegin
+\markdownRendererHeadingTwo{Flujo Completo (Después de Setup)}\markdownRendererInterblockSeparator
+{}\markdownRendererInputFencedCode{./_markdown_main/5ed2312d64db09eacdf1b630328ca08f.verbatim}{bash}{bash}\markdownRendererInterblockSeparator
+{}\markdownRendererThematicBreak{}\markdownRendererInterblockSeparator
+{}
+\markdownRendererSectionEnd \markdownRendererSectionBegin
+\markdownRendererHeadingTwo{Notas}\markdownRendererInterblockSeparator
+{}\markdownRendererUlBeginTight
+\markdownRendererUlItem \markdownRendererStrongEmphasis{S3 Native Locking}: Terraform usa \markdownRendererCodeSpan{use\markdownRendererUnderscore{}lockfile = true} (S3 native locking, no necesita DynamoDB).\markdownRendererUlItemEnd 
+\markdownRendererUlItem \markdownRendererStrongEmphasis{Credenciales AWS}: Se leen automáticamente desde \markdownRendererCodeSpan{\markdownRendererTilde{}/.aws/credentials} (resultado de \markdownRendererCodeSpan{aws configure}).\markdownRendererUlItemEnd 
+\markdownRendererUlItem \markdownRendererStrongEmphasis{Región}: Todos los buckets en \markdownRendererCodeSpan{eu-south-2} (editar en comandos si prefieres otra región).\markdownRendererUlItemEnd 
+\markdownRendererUlItem \markdownRendererStrongEmphasis{Buckets únicos}: Los nombres de buckets S3 son \markdownRendererStrongEmphasis{globales}. Si ya existen, usa nombres diferentes en \markdownRendererCodeSpan{deploy.py}, \markdownRendererCodeSpan{terraform.tfvars} y estos comandos.\markdownRendererUlItemEnd 
+\markdownRendererUlEndTight 
+\markdownRendererSectionEnd 
+\markdownRendererSectionEnd \markdownRendererDocumentEnd

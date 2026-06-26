@@ -6,7 +6,7 @@ La evaluación rigurosa de un modelo de lenguaje requiere ir más allá de la ob
 % ---------------------------------------------------------------
 \subsection{Entorno y Configuración del Benchmark}
 
-La evaluación se ejecuta en el mismo entorno de producción utilizado para el entrenamiento: una instancia \texttt{g6.2xlarge} de AWS equipada con una GPU NVIDIA L4 (24 GB VRAM). Esta decisión garantiza que las métricas de latencia y throughput sean representativas del rendimiento real en despliegue, y no de un entorno de laboratorio distinto al operacional.
+La evaluación se ejecuta sobre la instancia \texttt{g7e.2xlarge} equipada con una GPU \textbf{NVIDIA RTX PRO 6000 Server} (96 GB VRAM), el mismo hardware utilizado para el entrenamiento final. A lo largo del proyecto se emplearon tres generaciones de hardware de forma progresiva: la NVIDIA L4 (24 GB, instancia \texttt{g6.2xlarge}) en las fases iniciales de experimentación con un pico de uso de $\approx$20 GB; la NVIDIA L40S (48 GB, instancia \texttt{g6e.2xlarge}) en fases intermedias con un pico de $\approx$40 GB; y la RTX PRO 6000 (96 GB, instancia \texttt{g7e.2xlarge}) para el entrenamiento y benchmarking final, con un pico de 66,76 GB sobre los 300.000 samples con batch 64. Esta progresión garantiza que las métricas de latencia y throughput son representativas del entorno operacional real.
 
 El checkpoint evaluado corresponde al modelo final almacenado en S3 (\texttt{s3://tfm-slm-benchmarks/benchmark\_hybrid.json}), descargado automáticamente por el sistema de benchmarking. El conjunto de validación, igualmente descargado desde S3, consiste en \textbf{300.000 muestras} del dataset mixto de diálogos e instrucciones, procesadas en lotes de 64 tokens, lo que resulta en 4.688 iteraciones de evaluación.
 
@@ -16,7 +16,7 @@ El checkpoint evaluado corresponde al modelo final almacenado en S3 (\texttt{s3:
 \hline
 \textbf{Parámetro} & \textbf{Valor} \\ \hline
 Modelo evaluado & HybridBlock (12 capas, 768 oculto, 12 cabezas) \\ \hline
-Dispositivo & CUDA (NVIDIA L4) \\ \hline
+Dispositivo & CUDA (NVIDIA RTX PRO 6000 Server, 96 GB VRAM) \\ \hline
 Muestras de validación & 300.000 \\ \hline
 Tamaño de lote & 64 \\ \hline
 Iteraciones totales & 4.688 \\ \hline
@@ -36,7 +36,20 @@ El benchmark cubre diez métricas agrupadas en tres categorías: calidad del mod
 \paragraph{Pérdida y Perplejidad.}
 La \textbf{pérdida cross-entropy} final sobre el conjunto de validación es $\mathcal{L} = 1{,}091$. La \textbf{perplejidad}, definida como $\text{PPL} = e^{\mathcal{L}}$, alcanza un valor de \textbf{2,98}. La perplejidad puede interpretarse como el número efectivo de tokens igualmente probables que el modelo considera en cada posición: un valor de 2,98 indica que el modelo está altamente concentrado en sus predicciones, reduciendo la incertidumbre media a menos de 3 candidatos por token.
 
-El log de evaluación muestra que la perplejidad se estabilizó en $\approx 2{,}98$ a partir del batch 300 (de 4.688), permaneciendo constante hasta el final. Esta estabilidad, visible en la Figura~\ref{fig:perplexity_evolution}, es indicativa de una distribución de validación uniforme y de un modelo bien generalizado sin sobreajuste localizado.
+El log de evaluación muestra que la perplejidad se estabilizó en $\approx 2{,}98$ a partir del batch 70 (de 4.688), permaneciendo constante hasta el final. El siguiente extracto del fichero \texttt{.output/log\_benchmark.log} ilustra la progresión inicial y la rápida estabilización:
+
+\begin{lstlisting}[language=bash, caption={Extracto de \texttt{log\_benchmark.log}: estabilización de perplejidad a partir del batch 70.}]
+INFO: [10/4688]  Loss: 1.0668 | Perplexity: 2.87 | Acc@1: 80.5%
+INFO: [20/4688]  Loss: 1.1011 | Perplexity: 2.91 | Acc@1: 80.3%
+INFO: [30/4688]  Loss: 1.1393 | Perplexity: 2.92 | Acc@1: 80.2%
+INFO: [50/4688]  Loss: 1.1912 | Perplexity: 2.96 | Acc@1: 79.9%
+INFO: [70/4688]  Loss: 1.1335 | Perplexity: 2.98 | Acc@1: 79.8%
+INFO: [80/4688]  Loss: 1.1482 | Perplexity: 2.98 | Acc@1: 79.8%
+INFO: [100/4688] Loss: 1.1762 | Perplexity: 2.98 | Acc@1: 79.8%
+INFO: [150/4688] Loss: 1.1127 | Perplexity: 2.98 | Acc@1: 79.7%
+\end{lstlisting}
+
+Esta estabilidad es indicativa de una distribución de validación uniforme y de un modelo bien generalizado sin sobreajuste localizado.
 
 \paragraph{Precisión de Predicción.}
 Se reportan tres niveles de precisión en la predicción del siguiente token:
@@ -54,7 +67,9 @@ Top-10 Accuracy & 93,56\% & El token correcto está entre las 10 primeras predic
 \label{tab:accuracy}
 \end{table}
 
-Una precisión Top-1 del 79,75\% sobre 300.000 muestras es un resultado sólido para un modelo entrenado desde cero con 167M de parámetros. La diferencia de 11,39 puntos porcentuales entre Top-1 y Top-5 refleja la naturaleza inherentemente ambigua del lenguaje natural: en muchos contextos, múltiples tokens son igualmente válidos como continuación, y el modelo los sitúa correctamente entre sus candidatos principales.
+Una precisión Top-1 del 79,75\% sobre 300.000 muestras es un resultado cuantitativamente sólido para un modelo entrenado desde cero con 167M de parámetros. La diferencia de 11,39 puntos porcentuales entre Top-1 y Top-5 refleja la naturaleza inherentemente ambigua del lenguaje natural: en muchos contextos, múltiples tokens son igualmente válidos como continuación, y el modelo los sitúa correctamente entre sus candidatos principales.
+
+No obstante, estas métricas deben interpretarse con cautela. Las leyes de escala de Chinchilla~\cite{hoffmann2022chinchilla} establecen que un modelo de 167M de parámetros requiere aproximadamente \textbf{3.340 millones de tokens} para alcanzar capacidades generativas óptimas. Este proyecto procesó $\approx$\textbf{713 millones de tokens} de entrenamiento (46.439 muestras $\times$ 1.024 tokens $\times$ 15 épocas; las 300.000 muestras restantes del dataset se reservaron para esta evaluación) --- 4,7 veces menos del volumen óptimo (ratio 4,27:1 frente al 20:1 de Chinchilla). Una alta precisión de predicción sobre datos en distribución no garantiza coherencia en generación libre, ya que en inferencia autoregresiva los errores se propagan: un token mal predicho condiciona todos los siguientes. El análisis cualitativo completo se recoge en el Capítulo~\ref{sec:conclusiones}.
 
 \subsubsection{Eficiencia Computacional}
 
@@ -71,7 +86,7 @@ Esta discrepancia se explica por la diferencia de granularidad en la medición: 
 El modelo cuenta con \textbf{166.980.864 parámetros}, todos ellos entrenables, con un tamaño en disco de \textbf{636,98 MB}. Esto lo sitúa en la categoría de Small Language Model (SLM), equiparable en orden de magnitud a GPT-2 Medium (345M params) pero con una huella de memoria significativamente menor gracias a la arquitectura híbrida.
 
 \paragraph{Memoria en Pico.}
-El pico de memoria GPU durante la evaluación fue de \textbf{66,76 GB}. Este valor corresponde a la evaluación sobre los 300.000 samples con batch 64, e incluye las activaciones intermedias acumuladas para el cómputo de métricas. Durante la inferencia en producción (sin acumulación de gradientes ni activaciones), el consumo de memoria es considerablemente inferior y se mantiene dentro de los 24 GB disponibles en la L4.
+El pico de memoria GPU durante la evaluación fue de \textbf{66,76 GB}, sobre los 96 GB disponibles en la NVIDIA RTX PRO 6000 Server. Este valor corresponde a 300.000 muestras con batch 64 en modo solo forward pass (sin gradientes), con activaciones intermedias acumuladas para el cómputo de métricas. Durante la inferencia en producción (un único token por paso con KV-cache, sin activaciones intermedias), el consumo desciende a $\approx$20 GB, compatible con la NVIDIA L4 empleada en fases anteriores del proyecto. El pico durante el entrenamiento completo se documenta en el Capítulo~\ref{sec:infraestructura}.
 
 % ---------------------------------------------------------------
 \subsection{Análisis de Estabilidad}
@@ -106,4 +121,6 @@ Tamaño del modelo & 636,98 MB & Recursos \\ \hline
 \label{tab:benchmark_summary}
 \end{table}
 
-Los resultados demuestran que la arquitectura híbrida Transformer-GRU alcanza un equilibrio eficiente entre calidad de predicción y coste computacional. Una perplejidad de 2,98 y una precisión Top-1 superior al 79\% son resultados competitivos para un modelo de 167M de parámetros entrenado desde cero sobre datos públicos, validando la hipótesis central del trabajo: las arquitecturas híbridas pueden lograr rendimiento comparable al de los Transformers puros con una fracción de los requisitos de memoria.
+Los resultados cuantitativos son sólidos: una perplejidad de 2,98 y una precisión Top-1 del 79,75\% sobre 300.000 muestras son cifras competitivas para un modelo de 167M de parámetros entrenado desde cero. Sin embargo, estas métricas miden capacidad predictiva \textit{en distribución} ---sobre datos extraídos de la misma mezcla de entrenamiento---, no calidad de generación libre.
+
+Como se documenta en el Capítulo~\ref{sec:conclusiones}, la evaluación cualitativa mediante inferencia real revela un cuadro distinto: el modelo produce bucles de repetición, incoherencia semántica y mezcla de idiomas de forma sistemática. La causa no es arquitectónica sino de escala de datos: con 713 millones de tokens de entrenamiento frente a los 3.340 millones que prescriben las leyes de Chinchilla~\cite{hoffmann2022chinchilla} para un modelo de este tamaño (ratio 4,27:1 frente al óptimo de 20:1, 4,7 veces menos), las capacidades generativas emergentes no se desarrollan. Las métricas del benchmark son necesarias pero no suficientes para evaluar la utilidad real de un modelo de lenguaje.

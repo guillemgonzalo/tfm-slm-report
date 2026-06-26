@@ -35,6 +35,13 @@ El mecanismo de \textit{Multi-Head Attention} (MHA) extiende la atención simple
 
 En el modelo propuesto se utilizan $h = 12$ cabezas sobre un espacio de $d_{model} = 768$ dimensiones, resultando en $d_k = 64$ por cabeza. Esta configuración captura relaciones semánticas a distintos niveles de abstracción simultáneamente, desde co-referencias pronominales hasta dependencias sintácticas de largo alcance.
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.40\textwidth]{images/diagrams_transformer/transformer_block.pdf}
+    \caption{Bloque Transformer estándar: Pre-LayerNorm seguida de Multi-Head Attention y MLP, con conexiones residuales. No incorpora componente recurrente ni memoria entre bloques.}
+    \label{fig:block_transformer}
+\end{figure}
+
 % ---------------------------------------------------------------
 \subsection{Gated Recurrent Units (GRU)}
 
@@ -52,6 +59,13 @@ donde $\sigma$ es la función sigmoide y $\odot$ denota el producto elemento a e
 \subsubsection{Justificación de GRU frente a LSTM}
 
 La elección de GRU sobre LSTM está motivada por criterios de eficiencia en parámetros: una celda GRU tiene dos puertas frente a las tres de una LSTM (más la celda de memoria $c_t$), lo que reduce el número de parámetros por unidad en aproximadamente un 25\%. Estudios empíricos como los de Chung et al.~\cite{chung2014empirical} demuestran que esta reducción no implica pérdida significativa de rendimiento en tareas de modelado del lenguaje cuando el estado oculto tiene dimensión suficiente. En el contexto de un SLM con recursos limitados, esta eficiencia es determinante.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.40\textwidth]{images/diagrams_gru/gru_block.pdf}
+    \caption{Bloque GRU estándar: Pre-LayerNorm seguida de GRU con conexión residual. Captura patrones locales pero pierde contexto global a larga distancia; el estado oculto no persiste entre bloques.}
+    \label{fig:block_gru}
+\end{figure}
 
 % ---------------------------------------------------------------
 \subsection{La Hipótesis Híbrida: Análisis de Complejidad}

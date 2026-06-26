@@ -1,0 +1,5 @@
+# Opción 1: Modo TRAINING (descarga → procesa → entrena con GPU)
+echo "1" | python3 deploy.py
+
+# Opción 2: Modo INFERENCE (construye imagen, corre chat interactivo en EC2)
+echo "2" | python3 deploy.py

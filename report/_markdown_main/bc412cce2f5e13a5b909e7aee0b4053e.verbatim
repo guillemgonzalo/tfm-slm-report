@@ -1,0 +1,8 @@
+# Listar todos tus buckets
+aws s3 ls
+
+# Verificar todos los buckets están en eu-south-2
+aws s3api list-buckets --query 'Buckets[?contains(Name, `tfm-slm`)]'
+
+# Verificar versionado está habilitado en terraform-state
+aws s3api get-bucket-versioning --bucket tfm-slm-terraform-state

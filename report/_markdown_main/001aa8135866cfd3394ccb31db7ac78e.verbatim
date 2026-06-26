@@ -1,0 +1,14 @@
+# Opción 3: Modo BENCHMARKING (descarga dataset + checkpoint, evalúa)
+echo "3" | python3 deploy.py
+
+# Provisionar EC2
+cd app/terraform && terraform apply -auto-approve -lock=false
+
+# Monitor
+ssh -i "tfm-slm.pem" ec2-user@<IP> tail -f /var/log/user-data.log
+
+# EC2 automáticamente:
+# 1. Descarga mixed_dataset.tar.gz de S3
+# 2. Descarga checkpoint.pt de S3
+# 3. Ejecuta tfm-slm-benchmark
+# 4. Sube resultados a s3://tfm-slm-benchmarks/benchmark_hybrid.json

@@ -1,0 +1,8 @@
+# Pausar (destruye EC2, pero S3 y ECR persisten)
+terraform destroy -auto-approve -lock=false
+
+# Verificar que se destruyó
+terraform output ec2_public_ip  # Debe estar vacío
+
+# Reanudar (EC2 descarga código, compila si necesario, continúa entrenamiento)
+terraform apply -auto-approve -lock=false

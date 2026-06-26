@@ -1,11 +1,11 @@
-\section{Datos y Datasets para Pre-entrenamiento}
+\section{Datos y Datasets para Entrenamiento}
 \label{sec:datasets}
 
 El rendimiento de un Small Language Model depende críticamente de la calidad, diversidad y representatividad de los datos de entrenamiento. Este capítulo documenta exhaustivamente la estrategia de curación, selección y procesamiento de datasets que alimentan el modelo híbrido propuesto, justificando cada decisión arquitectónica sobre la base de las características semánticas y lingüísticas de cada fuente.
 
 \subsection{Principios de Diseño para la Mezcla de Datos}
 
-La selección de datasets para pre-entrenamiento de un SLM requiere equilibrar múltiples objetivos en tensión:
+La selección de datasets para entrenamiento de un SLM requiere equilibrar múltiples objetivos en tensión:
 
 \begin{enumerate}
     \item \textbf{Cobertura Lingüística}: El modelo debe capturar patrones sintácticos y semánticos amplios, desde gramática básica hasta construcciones complejas.
@@ -94,23 +94,23 @@ UltraChat es el dataset más grande de la mezcla, enfatizando conversaciones lar
 
 \textbf{Rol en el Modelo}: UltraChat es fundamental para validar la arquitectura híbrida propuesta. Mientras que los Transformers puros pueden procesar contextos largos mediante su mecanismo de atención global, la arquitectura híbrida combina atención con GRU para mantener memoria secuencial. El volumen de datos de contexto largo de UltraChat permite que el modelo practique tanto el mecanismo de atención (capturando relaciones globales) como el GRU (refinando patrones secuenciales), entrenando efectivamente la verdadera hibridación arquitectónica.
 
-\subsubsection{The Stack (YAML) - Gated, No Incluido}
+\subsubsection{The Stack (Python) - Gated, No Incluido}
 
-\textbf{Identificador}: \texttt{bigcode/the-stack}~\cite{kocetkov2022stack} (subconjunto: \texttt{data/yaml}) \\
+\textbf{Identificador}: \texttt{bigcode/the-stack}~\cite{kocetkov2022stack} (subconjunto: \texttt{data/python}) \\
 \textbf{Estado}: Comentado en configuración; requiere aprobación manual en Hugging Face \\
-\textbf{Tipo de Datos}: Archivos de configuración YAML, Dockerfiles, scripts de infraestructura
+\textbf{Tipo de Datos}: Código fuente Python de repositorios públicos
 
-The Stack es un corpus gigantesco (11 terabytes de código fuente) compilado a partir de repositorios públicos. El subconjunto YAML contiene archivos de configuración y manifests de infraestructura, útiles para dotar al modelo de comprensión de sintaxis DevOps y patrones de infraestructura-como-código.
+The Stack es un corpus de 11 terabytes de código fuente compilado a partir de repositorios GitHub con licencias permisivas. El subconjunto Python es el más representativo para un SLM de propósito general, dotando al modelo de comprensión de sintaxis, patrones algorítmicos y documentación técnica en el lenguaje de programación más usado en machine learning e ingeniería de software.
 
 \textbf{Características Principales}:
 \begin{itemize}
     \item \textbf{Acceso}: Dataset gated; requiere aceptación de términos y aprobación en Hugging Face
-    \item \textbf{Tamaño total}: 11 TB; subconjunto YAML es ~50 GB
-    \item \textbf{Contenido}: YAML, JSON, Docker, Kubernetes, Terraform, configuraciones varias
-    \item \textbf{Propósito}: Conocimiento especializado en infraestructura y configuración
+    \item \textbf{Tamaño total}: 11 TB total; subconjunto Python es ~50 GB
+    \item \textbf{Contenido}: Scripts Python, notebooks, módulos, docstrings, comentarios
+    \item \textbf{Propósito}: Conocimiento de programación, razonamiento algorítmico y documentación técnica
 \end{itemize}
 
-\textbf{Razón de Exclusión}: Aunque técnicamente valuable, la naturaleza gated del dataset (requiere aprobación explícita en Hugging Face) añade fricción operacional. Para este TFM, se priorizó la reproducibilidad inmediata con datasets de acceso abierto. Sin embargo, The Stack puede integrarse fácilmente una vez aprobado.
+\textbf{Razón de Exclusión}: La naturaleza gated del dataset (requiere aprobación explícita en Hugging Face) añade fricción operacional incompatible con el requisito de reproducibilidad inmediata. Su configuración permanece comentada en \texttt{app/dataset/constants.py} y puede integrarse una vez obtenida la aprobación.
 
 \subsection{Estrategia de Mezcla: Ponderación y Proporción}
 
@@ -121,14 +121,21 @@ Cada dataset contribuye una proporción diferente al entrenamiento, diseñada pa
 \begin{tabularx}{\textwidth}{|l|c|c|X|}
 \hline
 \textbf{Dataset} & \textbf{Peso} & \textbf{Ejemplos} & \textbf{Justificación} \\ \hline
-OpenAssistant & 30\% & ~30k ejemplos & Base de naturalidad conversacional \\ \hline
-UltraChat & 30\% & ~30k ejemplos & Validación de consistencia largo plazo y arquitectura híbrida \\ \hline
-Alpaca & 20\% & ~10.4k ejemplos & Señal de instruction-following estructurado \\ \hline
-ShareGPT & 20\% & ~18k ejemplos & Transferencia de estilos resolutivos avanzados \\ \hline
-\textbf{Total} & \textbf{100\%} & \textbf{~88.4k} & Equilibrio entre naturalidad, estructura y complejidad \\ \hline
+OpenAssistant & 30\% & ~103.932 ejemplos & Base de naturalidad conversacional \\ \hline
+UltraChat & 30\% & ~103.932 ejemplos & Validación de consistencia largo plazo y arquitectura híbrida \\ \hline
+Alpaca & 20\% & ~69.288 ejemplos & Señal de instruction-following estructurado \\ \hline
+ShareGPT & 20\% & ~69.287 ejemplos & Transferencia de estilos resolutivos avanzados \\ \hline
+\textbf{Total} & \textbf{100\%} & \textbf{346.439} & Equilibrio entre naturalidad, estructura y complejidad \\ \hline
 \end{tabularx}
-\caption{Distribución de pesos para mezcla de datasets de pre-entrenamiento. Con 100k ejemplos totales, cada época consume ~88.4k muestras de los datasets disponibles.}
+\caption{Distribución de pesos para mezcla de datasets de entrenamiento (346.439 muestras de 1.024 tokens cada una).}
 \end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.65\textwidth]{images/diagrams_datasets/dataset_pie.pdf}
+    \caption{Distribución porcentual de la mezcla de entrenamiento (346.439 muestras de 1.024 tokens): OpenAssistant y UltraChat aportan ~103.932 muestras cada uno (30\%), mientras Alpaca y ShareGPT contribuyen ~69.288 cada uno (20\%).}
+    \label{fig:dataset_pie}
+\end{figure}
 
 \subsubsection{Justificación de Pesos}
 
@@ -205,17 +212,20 @@ Con la mezcla y ponderación descritas, el dataset consolidado tiene las siguien
 \begin{tabularx}{\textwidth}{|l|X|c|}
 \hline
 \textbf{Métrica} & \textbf{Descripción} & \textbf{Valor} \\ \hline
-Ejemplos Totales & Suma ponderada de ejemplos en mezcla & 88,400 \\ \hline
-Tokens por Ejemplo & Promedio; rango 100-2000 & ~850 tokens \\ \hline
-Contexto Máximo & Longitud máxima procesada por modelo & 1024 tokens \\ \hline
-Vocabulario & Tokens únicos (GPT-2 tokenizer) & 50,257 \\ \hline
-Épocas de Entrenamiento & Ciclos completos sobre el dataset & 5 épocas \\ \hline
-Total Tokens Procesados & $88.4k \times 850 \times 5$ & ~375M tokens \\ \hline
+Muestras totales en dataset Arrow & Verificado sobre archivos \texttt{.arrow} & 346.439 \\ \hline
+\quad — usadas en entrenamiento & Primeras $N$ muestras (trainer) & 46.439 \\ \hline
+\quad — usadas en validación & Últimas 300.000 muestras (benchmark) & 300.000 \\ \hline
+Tokens por Muestra & Longitud fija (padding/truncation) & 1.024 tokens \\ \hline
+Contexto Máximo & Longitud máxima procesada por modelo & 1.024 tokens \\ \hline
+Vocabulario & Tokens únicos (GPT-2 tokenizer) & 50.257 \\ \hline
+Épocas de Entrenamiento & Ciclos completos sobre el dataset & 15 épocas \\ \hline
+Tokens por Época (entrenamiento) & $46.439 \times 1.024$ & ~47,6M tokens \\ \hline
+Total Tokens Procesados & $46.439 \times 1.024 \times 15$ & ~713M tokens \\ \hline
 \end{tabularx}
-\caption{Estadísticas resumidas del dataset consolidado de entrenamiento. Con 375M tokens procesados en 5 épocas y modelo de 124M parámetros, la relación tokens/parámetros es ~3:1, dentro del rango óptimo reportado en literatura (2-10).}
+\caption{Estadísticas reales del dataset (verificadas sobre archivos Arrow y código fuente). Las primeras 46.439 muestras se usaron para entrenamiento; las últimas 300.000 se reservaron para el benchmark. Con 713M tokens de entrenamiento y modelo de 167M parámetros, la relación tokens/parámetros es ~4,27:1 --- 4,7 veces por debajo del óptimo de Chinchilla (20:1).}
 \end{table}
 
-Esta relación de 3:1 es significativa: investigaciones recientes (``Chinchilla Scaling Laws'', ``Textbooks Are All You Need'') sugieren que la mejor eficiencia se logra con datos cuantitativamente moderados pero cualitativamente superiores. El ratio de nuestro SLM refleja una apuesta consciente por calidad (mezcla cuidadosa de 4 datasets diversos) sobre cantidad bruta.
+El ratio de 4,27:1 está 4,7 veces por debajo del óptimo prescrito por las leyes de Chinchilla~\cite{hoffmann2022chinchilla} para un modelo de 167M de parámetros (20:1, equivalente a 3.340M tokens). La limitación es presupuestaria y temporal: alcanzar ese volumen habría requerido aproximadamente 4,7 veces más entrenamiento en la \texttt{g7e.2xlarge}, con un sobrecoste de $\approx$\$449 adicionales en GPU (~127h de cómputo extra). La estrategia de curación --- mezcla de cuatro datasets cualitativamente diversos --- maximiza la utilidad de los tokens disponibles, pero no puede compensar un déficit de escala de este orden. Las consecuencias sobre la calidad generativa se analizan en el Capítulo~\ref{sec:conclusiones}.
 
 \subsection{Validación de Cobertura y Diversidad}
 
@@ -227,4 +237,4 @@ Para validar que la mezcla logra el objetivo de diversidad, el pipeline incluye 
     \item \textbf{Análisis de Dominios}: Manual inspection de samples aleatorios para verificar que cubren conversación, instrucciones, razonamiento, técnica.
 \end{enumerate}
 
-Estos análisis se documentan en la suite de tests automatizados (Capítulo~\ref{sec:tests_validacion}).
+Estos análisis se documentan en la suite de tests automatizados (Capítulo~\ref{sec:mlops}).

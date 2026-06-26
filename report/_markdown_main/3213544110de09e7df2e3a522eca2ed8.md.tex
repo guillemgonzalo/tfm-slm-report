@@ -1,0 +1,84 @@
+\markdownRendererDocumentBegin
+\markdownRendererWarning{The `hybrid` option has been soft-deprecated.}{The `hybrid` option has been soft-deprecated.}{Consider using one of the following better options for mixing TeX and markdown: `contentBlocks`, `rawAttribute`, `texComments`, `texMathDollars`, `texMathSingleBackslash`, and `texMathDoubleBackslash`. For more information, see the user manual at <https://witiko.github.io/markdown/>.}{Consider using one of the following better options for mixing TeX and markdown: `contentBlocks`, `rawAttribute`, `texComments`, `texMathDollars`, `texMathSingleBackslash`, and `texMathDoubleBackslash`. For more information, see the user manual at <https://witiko.github.io/markdown/>.}\markdownRendererSectionBegin
+\markdownRendererHeadingOne{Guía Rápida de Comandos (Cheat Sheet)}\markdownRendererInterblockSeparator
+{}Esta guía contiene los comandos esenciales para gestionar la infraestructura, el deployment y el entrenamiento del SLM sin GitHub.\markdownRendererInterblockSeparator
+{}\markdownRendererSectionBegin
+\markdownRendererHeadingTwo{1. Deployment Local → S3 (Mac)}\markdownRendererInterblockSeparator
+{}\markdownRendererEmphasis{Ejecutar desde la carpeta raíz del proyecto (\markdownRendererCodeSpan{tfm\markdownRendererUnderscore{}slm/}) en tu ordenador local.}\markdownRendererInterblockSeparator
+{}\markdownRendererInputFencedCode{./_markdown_main/843051a2f96e5a6ac60ade6f353ebfdc.verbatim}{bash}{bash}\markdownRendererInterblockSeparator
+{}\markdownRendererStrongEmphasis{Qué hace deploy.py:}\markdownRendererInterblockSeparator
+{}\markdownRendererUlBeginTight
+\markdownRendererUlItem Archiva código (sin \markdownRendererStrongEmphasis{pycache}, .git, datasets)\markdownRendererUlItemEnd 
+\markdownRendererUlItem Sube ZIP a S3 bucket \markdownRendererCodeSpan{tfm-slm-code}\markdownRendererUlItemEnd 
+\markdownRendererUlItem Verifica ECR repo existe\markdownRendererUlItemEnd 
+\markdownRendererUlItem Actualiza \markdownRendererCodeSpan{terraform.tfvars} con modo seleccionado\markdownRendererUlItemEnd 
+\markdownRendererUlEndTight \markdownRendererInterblockSeparator
+{}
+\markdownRendererSectionEnd \markdownRendererSectionBegin
+\markdownRendererHeadingTwo{2. Gestión de Infraestructura (Terraform)}\markdownRendererInterblockSeparator
+{}\markdownRendererEmphasis{Ejecutar desde la carpeta \markdownRendererCodeSpan{app/terraform/} en tu ordenador local.}\markdownRendererInterblockSeparator
+{}\markdownRendererInputFencedCode{./_markdown_main/31abf7ba3ac5519e708c34cac1771369.verbatim}{bash}{bash}\markdownRendererInterblockSeparator
+{}
+\markdownRendererSectionEnd \markdownRendererSectionBegin
+\markdownRendererHeadingTwo{3. Monitorización del Build y Training en EC2}\markdownRendererInterblockSeparator
+{}\markdownRendererEmphasis{Ejecutar desde tu Mac (donde tengas tfm-slm.pem).}\markdownRendererInterblockSeparator
+{}\markdownRendererInputFencedCode{./_markdown_main/a796fc953c89410da3ddca4bed8b83a3.verbatim}{bash}{bash}\markdownRendererInterblockSeparator
+{}
+\markdownRendererSectionEnd \markdownRendererSectionBegin
+\markdownRendererHeadingTwo{4. Dentro de EC2 (si necesitas debugging)}\markdownRendererInterblockSeparator
+{}\markdownRendererEmphasis{SSH a EC2 y ejecuta:}\markdownRendererInterblockSeparator
+{}\markdownRendererInputFencedCode{./_markdown_main/fa9b48fba302c0cf4caa665cf1b3fa64.verbatim}{bash}{bash}\markdownRendererInterblockSeparator
+{}
+\markdownRendererSectionEnd \markdownRendererSectionBegin
+\markdownRendererHeadingTwo{5. Conexión SSH}\markdownRendererInterblockSeparator
+{}\markdownRendererEmphasis{Permisos y conexión básica.}\markdownRendererInterblockSeparator
+{}\markdownRendererInputFencedCode{./_markdown_main/770416cb53c9d773ad0755a841a56e4c.verbatim}{bash}{bash}\markdownRendererInterblockSeparator
+{}
+\markdownRendererSectionEnd \markdownRendererSectionBegin
+\markdownRendererHeadingTwo{6. Deploy y Ejecución de Inferencia (Chat)}\markdownRendererInterblockSeparator
+{}\markdownRendererSectionBegin
+\markdownRendererHeadingThree{Opción A: Desde Mac (flujo completo)}\markdownRendererInterblockSeparator
+{}\markdownRendererEmphasis{Sube código, construye imagen Docker con Flash Attention en EC2, lanza chat interactivo.}\markdownRendererInterblockSeparator
+{}\markdownRendererBlockQuoteBegin
+\markdownRendererStrongEmphasis{Nota:} \markdownRendererCodeSpan{docker run -it} requiere terminal real. EC2 UserData construye y sube la imagen a ECR,\markdownRendererSoftLineBreak
+{}pero el chat hay que lanzarlo manualmente por SSH (sin TTY, el chat se salta automáticamente).\markdownRendererBlockQuoteEnd \markdownRendererInterblockSeparator
+{}\markdownRendererInputFencedCode{./_markdown_main/24cd8c35f5f3cd566169c1984b99e31f.verbatim}{bash}{bash}\markdownRendererInterblockSeparator
+{}
+\markdownRendererSectionEnd \markdownRendererSectionBegin
+\markdownRendererHeadingThree{Opción B: Si EC2 ya tiene imagen construida (sin rebuild)}\markdownRendererInterblockSeparator
+{}\markdownRendererEmphasis{Imagen ya en ECR → solo lanzar contenedor.}\markdownRendererInterblockSeparator
+{}\markdownRendererInputFencedCode{./_markdown_main/e9f74ec8b36280137f0768d362fbb4c5.verbatim}{bash}{bash}\markdownRendererInterblockSeparator
+{}\markdownRendererStrongEmphasis{Flujo interno del contenedor en modo inferencia:}\markdownRendererInterblockSeparator
+{}\markdownRendererOlBeginTight
+\markdownRendererOlItemWithNumber{1}Descarga checkpoint desde S3 (\markdownRendererCodeSpan{tfm-slm-checkpoints/checkpoint.pt}) si no existe local\markdownRendererOlItemEnd 
+\markdownRendererOlItemWithNumber{2}Carga modelo HybridModel + tokenizer GPT-2\markdownRendererOlItemEnd 
+\markdownRendererOlItemWithNumber{3}Abre sesión de chat interactiva (\markdownRendererCodeSpan{Tú: ...})\markdownRendererOlItemEnd 
+\markdownRendererOlItemWithNumber{4}Escribe \markdownRendererCodeSpan{salir} / \markdownRendererCodeSpan{exit} / \markdownRendererCodeSpan{quit} para terminar\markdownRendererOlItemEnd 
+\markdownRendererOlEndTight \markdownRendererInterblockSeparator
+{}
+\markdownRendererSectionEnd 
+\markdownRendererSectionEnd \markdownRendererSectionBegin
+\markdownRendererHeadingTwo{7. Benchmarking (Evaluación de Checkpoint)}\markdownRendererInterblockSeparator
+{}\markdownRendererEmphasis{Evalúa checkpoint en 300K samples, exporta métricas (loss, perplexity, throughput).}\markdownRendererInterblockSeparator
+{}\markdownRendererSectionBegin
+\markdownRendererHeadingThree{Local (Mac)}\markdownRendererInterblockSeparator
+{}\markdownRendererInputFencedCode{./_markdown_main/53dd20c1dc8b2cbff5e4597e0ed42b1a.verbatim}{bash}{bash}\markdownRendererInterblockSeparator
+{}
+\markdownRendererSectionEnd \markdownRendererSectionBegin
+\markdownRendererHeadingThree{En EC2}\markdownRendererInterblockSeparator
+{}\markdownRendererInputFencedCode{./_markdown_main/001aa8135866cfd3394ccb31db7ac78e.verbatim}{bash}{bash}\markdownRendererInterblockSeparator
+{}\markdownRendererStrongEmphasis{Métricas generadas:}\markdownRendererInterblockSeparator
+{}\markdownRendererUlBeginTight
+\markdownRendererUlItem Loss (promedio)\markdownRendererUlItemEnd 
+\markdownRendererUlItem Perplexity\markdownRendererUlItemEnd 
+\markdownRendererUlItem Throughput (tokens/sec)\markdownRendererUlItemEnd 
+\markdownRendererUlItem Peak memory (GB)\markdownRendererUlItemEnd 
+\markdownRendererUlEndTight \markdownRendererInterblockSeparator
+{}
+\markdownRendererSectionEnd 
+\markdownRendererSectionEnd \markdownRendererSectionBegin
+\markdownRendererHeadingTwo{8. Pausar y Reanudar (Ahorro de Costes)}\markdownRendererInterblockSeparator
+{}\markdownRendererEmphasis{Detiene EC2 pero mantiene checkpoint y imagen ECR.}\markdownRendererInterblockSeparator
+{}\markdownRendererInputFencedCode{./_markdown_main/814092f49c02e31debceb66af638ad1c.verbatim}{bash}{bash}
+\markdownRendererSectionEnd 
+\markdownRendererSectionEnd \markdownRendererDocumentEnd

@@ -1,0 +1,6 @@
+# Ejecutar en carpeta raíz del proyecto
+uv run tfm-slm-benchmark
+
+# Resultados:
+# - Local: output/benchmark_hybrid.json
+# - S3: s3://tfm-slm-benchmarks/benchmark_hybrid.json

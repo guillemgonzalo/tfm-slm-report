@@ -1,0 +1,55 @@
+\documentclass[border={8pt 8pt 8pt 8pt}]{standalone}
+\usepackage{pgfplots}
+\usepackage{xcolor}
+\usetikzlibrary{calc}
+\pgfplotsset{compat=1.18}
+
+\definecolor{actualcolor}{RGB}{34,150,100}
+\definecolor{chinchillacolor}{RGB}{190,80,50}
+
+\begin{document}
+\begin{tikzpicture}
+\begin{axis}[
+    name=costaxis,
+    ybar,
+    bar width=2cm,
+    width=11cm,
+    height=7.5cm,
+    enlarge x limits=0.45,
+    ylabel={Coste GPU ciclo final (USD)},
+    symbolic x coords={Actual, Chinchilla-optimal},
+    xtick=data,
+    xticklabels={, },
+    ymin=0, ymax=700,
+    ytick={0,100,200,300,400,500,600,700},
+    nodes near coords,
+    nodes near coords style={font=\small\bfseries, above},
+    grid=major,
+    grid style={dashed, gray!30},
+    tick label style={font=\small},
+    label style={font=\small},
+    title style={font=\small\bfseries},
+    title={Coste GPU: entrenamiento actual vs Chinchilla-optimal},
+]
+\addplot[fill=actualcolor, draw=actualcolor!80!black]
+    coordinates {(Actual, 122)};
+\addplot[fill=chinchillacolor, draw=chinchillacolor!80!black]
+    coordinates {(Chinchilla-optimal, 571)};
+\end{axis}
+
+% With enlarge x limits=0.45 and 2 symbolic coords:
+% Actual bar  ≈ 23.7% from SW→SE;  Chinchilla-optimal ≈ 76.3%
+\node[below=14pt, font=\small, align=center, anchor=north]
+    at ($(costaxis.south west)!0.237!(costaxis.south east)$)
+    {Actual\\713M tokens\\15 \'epocas -- 34,5h};
+
+\node[below=14pt, font=\small, align=center, anchor=north]
+    at ($(costaxis.south west)!0.763!(costaxis.south east)$)
+    {Chinchilla-optimal\\3.340M tokens\\aprox. 70 \'epocas -- 161,4h};
+
+\node[below=2cm, font=\footnotesize, align=center, anchor=north, gray]
+    at (costaxis.south)
+    {Instancia \texttt{g7e.2xlarge} -- \$3,54/h On-Demand\\RTX PRO 6000 Server};
+
+\end{tikzpicture}
+\end{document}

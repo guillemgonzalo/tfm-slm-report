@@ -30,12 +30,12 @@ Este trabajo propone una \textbf{arquitectura híbrida que combina Transformer M
 
 \subsection{Objetivos}
 
-El objetivo principal es diseñar, implementar y validar esta arquitectura híbrida SLM, evaluando su rendimiento en términos absolutos y contextualizando los resultados respecto a la literatura publicada sobre modelos de escala comparable.
+El objetivo principal es diseñar, implementar y validar esta arquitectura híbrida SLM, evaluando su rendimiento mediante métricas cuantitativas estándar y analizando las limitaciones prácticas del entrenamiento desde cero en entornos con presupuesto de cómputo reducido.
 
-\textbf{Objetivo 1 --- Pre-entrenamiento y Validación Arquitectónica:}
+\textbf{Objetivo 1 --- Entrenamiento y Validación Arquitectónica:}
 \begin{itemize}
     \item Implementación de la arquitectura híbrida con optimizaciones CUDA
-    \item Pre-entrenamiento desde cero sobre datasets conversacionales públicos (OpenAssistant, ShareGPT, Alpaca)
+    \item Entrenamiento desde cero sobre datasets conversacionales públicos (OpenAssistant, ShareGPT, Alpaca)
     \item Evaluación cuantitativa mediante métricas estándar de modelado del lenguaje:
     \begin{itemize}
         \item Perplejidad (capacidad predictiva)
@@ -55,9 +55,9 @@ El objetivo principal es diseñar, implementar y validar esta arquitectura híbr
 \subsection{Contribuciones}
 
 \begin{enumerate}
-    \item \textbf{Arquitectura híbrida Transformer-GRU}: demostración de que la combinación de atención global y recurrencia local permite reducir la huella de memoria sin sacrificar capacidad predictiva
-    \item \textbf{Benchmark exhaustivo}: evaluación cuantitativa de 10 métricas sobre 300.000 muestras de validación, con análisis de estabilidad y contextualización respecto a la literatura
-    \item \textbf{Pipeline de ingeniería end-to-end}: implementación completa desde pre-entrenamiento hasta despliegue en producción, incluyendo infraestructura cloud y automatización de testing
+    \item \textbf{Arquitectura híbrida Transformer-GRU}: diseño e implementación de un bloque híbrido con estados GRU persistentes, validando su convergencia y estabilidad frente a la arquitectura original mediante métricas de gradiente y pérdida
+    \item \textbf{Benchmark exhaustivo}: evaluación cuantitativa de 10 métricas sobre 300.000 muestras de validación, con análisis de estabilidad y diagnóstico honesto de las limitaciones cualitativas del modelo resultante
+    \item \textbf{Pipeline de ingeniería end-to-end}: implementación completa desde Entrenamiento hasta despliegue en producción, incluyendo infraestructura cloud y automatización de testing
 \end{enumerate}
 
 \subsection{Estructura del Documento}
@@ -65,13 +65,14 @@ El objetivo principal es diseñar, implementar y validar esta arquitectura híbr
 \begin{itemize}
     \item \textbf{Capítulo 2}: Estado del arte --- evolución de LLM a SLM, RNN, LSTM, GRU, Transformers y arquitecturas híbridas modernas
     \item \textbf{Capítulo 3}: Fundamentos teóricos --- formalización matemática del mecanismo de atención, MHA, GRU y análisis de complejidad híbrida
-    \item \textbf{Capítulo 4}: Datos y datasets --- descripción de los conjuntos de datos utilizados para el pre-entrenamiento
+    \item \textbf{Capítulo 4}: Datos y datasets --- descripción de los conjuntos de datos utilizados para el entrenamiento
     \item \textbf{Capítulo 5}: Mejoras arquitectónicas e implementación --- proceso iterativo de desarrollo y decisiones de ingeniería
-    \item \textbf{Capítulo 6}: Diseño e implementación de la arquitectura híbrida --- especificación técnica del modelo final
+    \item \textbf{Capítulo 6}: Diseño e implementación de la arquitectura híbrida --- estrategia de mezcla de datos, especificación técnica del modelo y configuración del entrenamiento
     \item \textbf{Capítulo 7}: Evaluación y benchmarking --- 10 métricas de calidad, eficiencia y recursos sobre 300.000 muestras
-    \item \textbf{Capítulo 8}: Infraestructura cloud y análisis de costes --- provisión con Terraform, EC2, S3 y ECR
-    \item \textbf{Capítulo 9}: MLOps: despliegue y puesta en producción --- CI/CD, testing automatizado, Terraform y diseño GitOps con ArgoCD
-    \item \textbf{Capítulo 10}: Conclusiones y trabajo futuro
+    \item \textbf{Capítulo 8}: Infraestructura cloud --- ecosistema AWS, hardware G6/G6e/G7e, Terraform, optimización de VRAM y progresión de hardware
+    \item \textbf{Capítulo 9}: Análisis de costes --- coste de infraestructura GPU por ciclo de entrenamiento y coste humano equivalente de un ingeniero junior en Data Science
+    \item \textbf{Capítulo 10}: MLOps: despliegue y puesta en producción --- CI/CD, reproducibilidad, Rulesets, testing automatizado, Terraform e infraestructura GitOps con Kubernetes y ArgoCD
+    \item \textbf{Capítulo 11}: Conclusiones y trabajo futuro
     \item \textbf{Anexo A}: Guía rápida de comandos
     \item \textbf{Anexo B}: Configuración del backend
 \end{itemize}

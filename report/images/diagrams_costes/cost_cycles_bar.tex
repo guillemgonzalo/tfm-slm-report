@@ -1,0 +1,54 @@
+\documentclass[border={8pt 8pt 8pt 8pt}]{standalone}
+\usepackage{pgfplots}
+\usepackage{xcolor}
+\usetikzlibrary{calc}
+\pgfplotsset{compat=1.18}
+
+\definecolor{l4color}{RGB}{52,120,190}
+\definecolor{l40scolor}{RGB}{34,150,100}
+\definecolor{rtxcolor}{RGB}{190,80,50}
+
+\begin{document}
+\begin{tikzpicture}
+\begin{axis}[
+    name=cycleaxis,
+    ybar,
+    bar width=1.4cm,
+    width=13cm,
+    height=7cm,
+    enlarge x limits=0.35,
+    ylabel={Coste On-Demand (USD)},
+    symbolic x coords={Ciclo 1, Ciclo 2, Ciclo 3},
+    xtick=data,
+    xticklabels={, , },
+    ymin=0, ymax=160,
+    ytick={0,20,40,60,80,100,120,140,160},
+    nodes near coords,
+    nodes near coords style={font=\small\bfseries, above},
+    every node near coord/.append style={/pgf/number format/.cd, fixed, precision=0},
+    grid=major,
+    grid style={dashed, gray!30},
+    tick label style={font=\small},
+    label style={font=\small},
+    title style={font=\small\bfseries},
+    title={Coste GPU por ciclo de entrenamiento},
+]
+\addplot[fill=l4color, draw=l4color!80!black] coordinates {(Ciclo 1, 40)};
+\addplot[fill=l40scolor, draw=l40scolor!80!black] coordinates {(Ciclo 2, 60)};
+\addplot[fill=rtxcolor, draw=rtxcolor!80!black] coordinates {(Ciclo 3, 122)};
+\end{axis}
+
+\node[below=10pt, font=\small, align=center, anchor=north]
+    at ($(cycleaxis.south west)!0.206!(cycleaxis.south east)$)
+    {Ciclo 1\\\small NVIDIA L4\\\small\texttt{g6.2xlarge}\\\footnotesize\color{gray}\$1,03/h};
+
+\node[below=10pt, font=\small, align=center, anchor=north]
+    at ($(cycleaxis.south west)!0.5!(cycleaxis.south east)$)
+    {Ciclo 2\\\small NVIDIA L40S\\\small\texttt{g6e.2xlarge}\\\footnotesize\color{gray}\$2,36/h};
+
+\node[below=10pt, font=\small, align=center, anchor=north]
+    at ($(cycleaxis.south west)!0.794!(cycleaxis.south east)$)
+    {Ciclo 3\\\small RTX PRO 6000\\\small\texttt{g7e.2xlarge}\\\footnotesize\color{gray}\$3,54/h};
+
+\end{tikzpicture}
+\end{document}

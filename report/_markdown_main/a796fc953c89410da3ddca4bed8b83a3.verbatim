@@ -1,0 +1,5 @@
+# Monitor en vivo (espera ~5-10 min para Docker build + training)
+ssh -i "tfm-slm.pem" ec2-user@<IP> tail -f /var/log/user-data.log
+
+# Si necesitas forzar nuevo build (borra imagen local)
+ssh -i "tfm-slm.pem" ec2-user@<IP> docker rmi $(<ID_IMAGEN>) -f

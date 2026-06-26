@@ -1,0 +1,19 @@
+# PASO 1 — Mac: subir código y provisionar EC2
+echo "2" | python3 deploy.py
+cd app/terraform && terraform apply -auto-approve -lock=false
+
+# PASO 2 — Esperar build (~10-15 min con Flash Attention)
+ssh -i "tfm-slm.pem" ec2-user@<IP>
+sudo tail -f /var/log/cloud-init-output.log
+# Esperar hasta ver: "Image pushed to ECR"
+
+# PASO 3 — Lanzar chat interactivo (desde dentro de EC2 por SSH)
+AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.eu-south-2.amazonaws.com/tfm-slm:latest"
+
+docker run --gpus all -it \
+  -e MODE=inference \
+  -v ~/.aws/credentials:/root/.aws/credentials:ro \
+  "$IMAGE_URI"
+# Descarga checkpoint desde S3 automáticamente y abre sesión "Tú: ..."
+# Escribe 'salir' para terminar

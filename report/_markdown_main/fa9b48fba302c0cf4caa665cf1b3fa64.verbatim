@@ -1,0 +1,12 @@
+# Ver contenedor activo
+docker ps
+
+# Ver logs del contenedor en vivo
+docker logs -f <ID_CONTENEDOR>
+
+# Ver estado GPU/VRAM
+nvidia-smi
+nvidia-smi -l 1  # Actualiza cada segundo
+
+# Ver CloudInit logs si Docker no está levantado aún
+sudo tail -f /var/log/cloud-init-output.log

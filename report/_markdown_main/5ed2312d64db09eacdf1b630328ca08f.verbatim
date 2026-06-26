@@ -1,0 +1,10 @@
+# 1. Preparar código y subirlo a S3 (elige modo: 1=train, 2=inference)
+echo "1" | python3 deploy.py
+
+# 2. Provisionar EC2 desde Terraform (descarga código, construye Docker con GPU)
+cd app/terraform
+terraform init      # Una sola vez
+terraform apply -auto-approve -lock=false
+
+# 3. Monitorizar build y training
+ssh -i "tfm-slm.pem" ec2-user@<IP> tail -f /var/log/user-data.log

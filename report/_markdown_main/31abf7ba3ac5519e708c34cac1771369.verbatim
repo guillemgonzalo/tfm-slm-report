@@ -1,0 +1,14 @@
+# Primera vez solamente (crea S3 backend para estado)
+terraform init
+
+# Ver cambios pendientes antes de aplicar
+terraform plan
+
+# Desplegar EC2 (descarga código, construye Docker con GPU, ejecuta según modo)
+terraform apply -auto-approve -lock=false
+
+# Obtener IP pública de EC2
+terraform output ec2_public_ip
+
+# Destruir todo (para ahorrar costes)
+terraform destroy -auto-approve -lock=false

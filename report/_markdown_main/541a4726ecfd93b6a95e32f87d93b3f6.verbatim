@@ -1,0 +1,3 @@
+# Verificar que tienes AWS CLI y credenciales configuradas
+aws sts get-caller-identity
+# Debe mostrar tu Account ID, User ARN y Account ID

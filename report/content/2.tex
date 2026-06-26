@@ -1,18 +1,9 @@
 \section{Estado del Arte}
 \label{sec:estado_del_arte}
 
-Este capítulo analiza el panorama actual de los modelos de lenguaje, la evolución hacia modelos más eficientes y las investigaciones previas en arquitecturas híbridas.
+Este capítulo traza la evolución de las arquitecturas de modelado del lenguaje desde sus orígenes en las redes recurrentes hasta las arquitecturas híbridas modernas, estableciendo el contexto técnico que motiva la propuesta de este trabajo.
 
-\subsection{Evolución de los Modelos de Lenguaje: De LLM a SLM}
-
-En los últimos años, el campo del Procesamiento del Lenguaje Natural (NLP) ha estado dominado por los \textit{Large Language Models} (LLM), cuya arquitectura base sigue siendo el Transformer propuesto por Vaswani et al.~\cite{vaswani2017attention}. Modelos como Llama 2~\cite{touvron2023llama} han demostrado capacidades emergentes sorprendentes al escalar el número de parámetros a miles de millones.
-
-Sin embargo, recientemente ha surgido una tendencia hacia los \textit{Small Language Models} (SLM), impulsada por la necesidad de eficiencia y despliegue en entornos con recursos limitados. Investigaciones como \textit{``Textbooks Are All You Need''}~\cite{gunasekar2023textbooks} demuestran que la calidad de los datos puede compensar el tamaño del modelo, permitiendo que arquitecturas de menos de 3 mil millones de parámetros (como Phi-3 o Mistral) compitan en tareas específicas con modelos mucho más grandes. En este contexto, la familia de modelos SmolLM~\cite{allal2024smollm} representa el estado actual de la técnica en SLMs ultra-eficientes, optimizando tanto el proceso de entrenamiento como la curación de datos para maximizar el rendimiento en dispositivos de consumo.
-
-\subsection{Limitaciones de los Transformers Puros}
-
-A pesar de su éxito, los Transformers convencionales presentan un cuello de botella fundamental: la complejidad cuadrática del mecanismo de auto-atención respecto a la longitud de la secuencia~\cite{vaswani2017attention}. Esto implica un consumo de memoria de vídeo (VRAM) y un tiempo de cómputo que crece de forma prohibitiva para contextos largos. En un entorno de producción, esto se traduce en altos costes operativos y latencias elevadas, lo que motiva la búsqueda de arquitecturas con escalado lineal.
-
+% ---------------------------------------------------------------
 \subsection{Fundamentos: Redes Neuronales Recurrentes (RNN)}
 
 Las Redes Neuronales Recurrentes introducidas por Rumelhart et al.~\cite{rumelhart1986learning} representan la primera arquitectura capaz de procesar secuencias manteniendo un estado oculto a lo largo del tiempo. En su forma más simple, una RNN vanilla aplica la misma función de transformación recurrentemente:
@@ -23,11 +14,19 @@ h_t = \tanh(W_{ih} x_t + W_{hh} h_{t-1} + b)
 
 donde $h_t$ es el estado oculto en tiempo $t$, $x_t$ es la entrada, y $W_{ih}$, $W_{hh}$ son matrices de pesos. El estado oculto actúa como memoria, permitiendo que la red capture dependencias temporales.
 
-Sin embargo, las RNNs vanilla sufren del problema de \textit{vanishing gradients}: durante el backpropagation a través del tiempo (BPTT), los gradientes se atenúan exponencialmente al propagarse hacia atrás a través de muchos pasos temporales. Esto hace prácticamente imposible entrenar redes que capturen dependencias a largo plazo más allá de 10-20 pasos de tiempo. El cálculo del gradiente requiere multiplicar matrices de Jacobiano repetidamente, y si sus valores propios son menores a 1, el gradiente tiende a cero exponencialmente.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.78\textwidth]{images/diagrams_estado_arte/rnn_chain.pdf}
+    \caption{Cadena recurrente de una RNN vanilla. El estado oculto $h_t$ se propaga de celda en celda, permitiendo capturar dependencias temporales pero con gradientes que se atenúan exponencialmente con la distancia.}
+    \label{fig:rnn_chain}
+\end{figure}
 
+Sin embargo, las RNNs vanilla sufren del problema de \textit{vanishing gradients}: durante el backpropagation a través del tiempo (BPTT), los gradientes se atenúan exponencialmente al propagarse hacia atrás a través de muchos pasos temporales. Esto hace prácticamente imposible entrenar redes que capturen dependencias a largo plazo más allá de 10--20 pasos de tiempo. El cálculo del gradiente requiere multiplicar matrices de Jacobiano repetidamente, y si sus valores propios son menores a 1, el gradiente tiende a cero exponencialmente.
+
+% ---------------------------------------------------------------
 \subsection{LSTM y GRU: Soluciones a Dependencias Largo Plazo}
 
-Para resolver el problema de vanishing gradients, Hochreiter y Schmidhuber propusieron las \textit{Long Short-Term Memory} (LSTM)~\cite{hochreiter1997long} networks. Las LSTM introducen \textit{compuertas} (gates) que controlan qué información fluye a través de la celda, permitiendo que gradientes fluyan sin atenuación:
+Para resolver el problema de vanishing gradients, Hochreiter y Schmidhuber propusieron las \textit{Long Short-Term Memory} (LSTM)~\cite{hochreiter1997lstm} networks. Las LSTM introducen \textit{compuertas} (gates) que controlan qué información fluye a través de la celda, permitiendo que gradientes fluyan sin atenuación:
 
 \begin{align}
 f_t &= \sigma(W_f \cdot [h_{t-1}, x_t] + b_f) \quad \text{(forget gate)} \\
@@ -37,6 +36,13 @@ C_t &= f_t \odot C_{t-1} + i_t \odot \tilde{C}_t \quad \text{(cell state)} \\
 o_t &= \sigma(W_o \cdot [h_{t-1}, x_t] + b_o) \quad \text{(output gate)} \\
 h_t &= o_t \odot \tanh(C_t)
 \end{align}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.62\textwidth]{images/diagrams_estado_arte/lstm_cell.pdf}
+    \caption{Celda LSTM con sus tres compuertas: forget gate (decide qué olvidar del cell state anterior), input gate (decide qué nueva información escribir) y output gate (decide qué parte del cell state exponer como $h_t$). Las conexiones aditivas en $C_t$ permiten flujo de gradiente sin atenuación.}
+    \label{fig:lstm_cell}
+\end{figure}
 
 Las compuertas utilizan funciones sigmoides que producen valores en $[0,1]$, permitiendo multiplicación suave sin saturación. La célula de memoria $C_t$ mantiene una conexión directa con gradientes a través de suma, evitando desvanecimiento.
 
@@ -49,8 +55,16 @@ z_t &= \sigma(W_z \cdot [h_{t-1}, x_t] + b_z) \quad \text{(update gate)} \\
 h_t &= (1 - z_t) \odot h_{t-1} + z_t \odot \tilde{h}_t
 \end{align}
 
-Las GRUs logran un rendimiento comparable a LSTMs con \textbf{menos parámetros} (~33\% menos) y son más fáciles de entrenar. Ambas arquitecturas eliminan el problema de vanishing gradients al mantener conexiones aditivas directas en la ruta del gradiente, pero siguen siendo secuenciales: el tiempo de inferencia crece linealmente con la longitud de la secuencia.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.62\textwidth]{images/diagrams_estado_arte/gru_cell.pdf}
+    \caption{Celda GRU. A diferencia de la LSTM, unifica las compuertas de olvido e input en una única \textit{update gate} ($z_t$) y añade una \textit{reset gate} ($r_t$) que controla cuánto del estado anterior $h_{t-1}$ fluye hacia el candidato. La salida $h_t = (1-z_t)\odot h_{t-1} + z_t \odot \tilde{h}_t$ mezcla directamente estado anterior y candidato sin estado de celda separado.}
+    \label{fig:gru_cell}
+\end{figure}
 
+Las GRUs logran un rendimiento comparable a LSTMs con \textbf{menos parámetros} ($\sim$33\% menos) y son más fáciles de entrenar. Ambas arquitecturas eliminan el problema de vanishing gradients al mantener conexiones aditivas directas en la ruta del gradiente, pero siguen siendo secuenciales: el tiempo de inferencia crece linealmente con la longitud de la secuencia.
+
+% ---------------------------------------------------------------
 \subsection{El Mecanismo de Atención y el Nacimiento de los Transformers}
 
 El cuello de botella de la secuencialidad se direccionó mediante el mecanismo de \textit{atención}. Bahdanau et al.~\cite{bahdanau2014neural} propusieron que en lugar de comprimir toda la entrada en un único vector, el decodificador debería poder enfocarse selectivamente en diferentes partes de la entrada en cada paso de decodificación.
@@ -63,7 +77,29 @@ El mecanismo de atención calcula un score de relevancia entre una consulta (que
 
 donde $V$ son los valores. La matriz $\text{softmax}(QK^T / \sqrt{d_k})$ actúa como un mapa de pesos que distribuye atención sobre toda la secuencia. A diferencia de la recurrencia, el cálculo de atención es \textbf{paralelizable}: todos los pares de posiciones pueden computarse simultáneamente sin dependencias secuenciales.
 
-Vaswani et al.~\cite{vaswani2017attention} llevaron este concepto al extremo en su modelo \textit{Transformer}, eliminando la recurrencia completamente y construyendo la arquitectura entera sobre mecanismos de auto-atención y redes feed-forward. El Transformer aplica múltiples cabezas de atención (Multi-Head Attention, MHA) en paralelo, permitiendo al modelo atender a diferentes subespacios de representación:
+Vaswani et al.~\cite{vaswani2017attention} llevaron este concepto al extremo en su modelo \textit{Transformer}, eliminando la recurrencia completamente y construyendo la arquitectura entera sobre mecanismos de auto-atención y redes feed-forward.
+
+\paragraph{Encoder y Decoder.}
+El Transformer original se diseñó como arquitectura \textit{encoder-decoder} para traducción automática. El \textbf{encoder} recibe la secuencia de entrada completa y la transforma en representaciones contextuales densas: cada token puede atender a todos los demás tokens de la entrada de forma bidireccional. El \textbf{decoder} recibe los tokens ya generados y produce el siguiente: aplica auto-atención \textit{causal} (solo atiende a posiciones anteriores) más \textit{cross-attention} sobre las representaciones del encoder para incorporar información de la entrada original.
+
+Esta separación generó tres familias arquitectónicas con usos bien diferenciados:
+
+\begin{itemize}
+    \item \textbf{Solo encoder} (ej.\ BERT~\cite{devlin2018bert}): atención bidireccional sobre toda la secuencia. Ideal para clasificación y comprensión lectora, no para generación autorregresiva.
+    \item \textbf{Solo decoder} (ej.\ GPT~\cite{radford2018gpt1}, LLaMA~\cite{touvron2023llama}): atención causal unidireccional. Genera texto token a token. Familia dominante en LLMs modernos.
+    \item \textbf{Encoder-decoder} (ej.\ T5, BART): combina ambos. Útil para traducción o resumen (secuencia-a-secuencia).
+\end{itemize}
+
+El modelo de este TFM es \textbf{decoder-only} con atención causal en cada HybridBlock, siguiendo el paradigma GPT.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.92\textwidth]{images/diagrams_estado_arte/arch_families.pdf}
+    \caption{Tres familias arquitectónicas derivadas del Transformer. \textbf{Encoder-only} (BERT): atención bidireccional, genera representaciones contextuales. \textbf{Decoder-only} (GPT, LLaMA): atención causal, genera texto autorregresivamente. \textbf{Encoder-Decoder} (T5, BART): combina ambos mediante cross-attention para tareas secuencia-a-secuencia.}
+    \label{fig:arch_families}
+\end{figure}
+
+El Transformer aplica múltiples cabezas de atención (Multi-Head Attention, MHA) en paralelo, permitiendo al modelo atender a diferentes subespacios de representación:
 
 \begin{equation}
 \text{MultiHead}(Q, K, V) = \text{Concat}(\text{head}_1, \ldots, \text{head}_h) W^O
@@ -78,12 +114,125 @@ donde cada $\text{head}_i$ es una atención independiente con sus propios pesos.
     \item \textbf{Conexiones Residuales}: Facilitan el flujo de gradientes a través de capas profundas.
 \end{enumerate}
 
-La capacidad del Transformer de procesar en paralelo combinada con su capacidad de atender a cualquier token independientemente de su distancia revolucionó el NLP, permitiendo entrenar en datasets gigantescos y escalar a miles de millones de parámetros. Sin embargo, la complejidad cuadrática $O(n^2)$ del mecanismo de atención respecto a la longitud de secuencia $n$ es prohibitiva para contextos largos.
+La capacidad del Transformer de procesar en paralelo combinada con su capacidad de atender a cualquier token independientemente de su distancia revolucionó el NLP, permitiendo entrenar en datasets gigantescos y escalar a miles de millones de parámetros.
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.60\textwidth]{images/diagrams_estado_arte/transformer_enc_dec.pdf}
+    \caption{Arquitectura Transformer encoder-decoder original~\cite{vaswani2017attention}. El encoder transforma la secuencia de entrada en representaciones contextuales densas mediante auto-atención bidireccional. El decoder genera la salida token a token con atención causal (masked) y cross-attention sobre las representaciones del encoder.}
+    \label{fig:transformer_enc_dec}
+\end{figure}
+
+% ---------------------------------------------------------------
+\subsection{Limitaciones de los Transformers Puros}
+
+A pesar de su éxito, los Transformers convencionales presentan un cuello de botella fundamental: la complejidad cuadrática del mecanismo de auto-atención respecto a la longitud de la secuencia~\cite{vaswani2017attention}. Esto implica un consumo de VRAM y un tiempo de cómputo que crece de forma prohibitiva para contextos largos. En un entorno de producción, esto se traduce en altos costes operativos y latencias elevadas, lo que motiva la búsqueda de arquitecturas con escalado lineal o sublineal.
+
+\subsubsection{Optimizaciones de la Atención: FlashAttention y GQA}
+
+Para mitigar el coste cuadrático dentro del paradigma Transformer, la comunidad ha desarrollado dos optimizaciones complementarias de adopción generalizada. \textbf{FlashAttention}~\cite{dao2022flashattention} reescribe el cómputo de la atención con consciencia de la jerarquía de memoria GPU (\textit{IO-awareness}): en lugar de materializar la matriz $QK^T \in \mathbb{R}^{L \times L}$ completa en HBM (\textit{High Bandwidth Memory}), el cómputo se divide en bloques que caben en SRAM, reduciendo los accesos a memoria en un factor $O(L/B)$ donde $B$ es el tamaño del bloque. El resultado es matemáticamente idéntico a la atención estándar, pero con uso de memoria $O(L)$ en lugar de $O(L^2)$ y una aceleración práctica de $2$--$4\times$ en GPUs modernas. En este trabajo se utiliza FlashAttention~v2.8.3 instalada mediante wheels precompiladas~\cite{mjun0812flashattentionwheels}, evitando la compilación desde fuente (que requiere $\sim$30 min en instancias AWS sin CUDA toolkit) y reduciendo el tiempo de instalación a menos de un minuto.
+
+\textbf{Grouped Query Attention (GQA)}~\cite{ainslie2023gqa} aborda el problema desde la perspectiva del KV Cache: en inferencia autoregresiva, almacenar claves y valores para todas las $h$ cabezas consume una fracción significativa de VRAM que crece con la longitud del contexto. GQA agrupa las $h$ cabezas de consulta en $g$ grupos que comparten un único conjunto de claves y valores ($g < h$), reduciendo el KV Cache en un factor $h/g$ sin pérdida apreciable de calidad. Modelos como Mistral-7B~\cite{jiang2023mistral} y Llama 3 adoptan GQA con $g=8$ cabezas KV frente a $h=32$ cabezas de consulta.
+
+Estas optimizaciones reducen el coste de la atención pero no eliminan su dependencia de $O(L^2)$ en cómputo, ni aportan un mecanismo de memoria secuencial explícita. La integración de capas GRU propuesta en este trabajo es complementaria: mientras FlashAttention y GQA hacen la atención más eficiente, el GRU provee un estado oculto compacto $h \in \mathbb{R}^d$ que captura dependencias locales con coste $O(L)$, sin necesidad de KV Cache.
+
+% ---------------------------------------------------------------
+\subsection{Evolución de los Modelos de Lenguaje: De RNN a LLM y SLM}
+
+\subsubsection{Era Pre-Transformer: Modelos de Lenguaje Recurrentes}
+
+Antes de los Transformers, los modelos de lenguaje neuronales se construían sobre RNNs y LSTMs. ELMo~(2018) fue uno de los primeros modelos en generar representaciones contextuales de palabras mediante LSTM bidireccionales de dos capas, procesando la secuencia en ambas direcciones para capturar contexto izquierdo y derecho. Sin embargo, estas arquitecturas recurrentes tenían dos limitaciones fundamentales: procesamiento estrictamente secuencial (no paralelizable durante el entrenamiento) y dificultad para capturar dependencias muy largas incluso con LSTMs.
+
+\subsubsection{GPT-1 y GPT-2: El Transformer Decoder como Modelo de Lenguaje}
+
+En 2018, OpenAI publicó GPT-1~\cite{radford2018gpt1}, que demostró que un Transformer decoder preentrenado sobre grandes corpus de texto podía transferir conocimiento lingüístico a tareas específicas mediante fine-tuning. GPT-1 contaba con 117M de parámetros, 12 capas, $d_{model}=768$ y 12 cabezas de atención --- exactamente los mismos hiperparámetros base que el modelo de este TFM. La clave era el preentrenamiento autorregresivo: el modelo aprende a predecir el siguiente token dados todos los anteriores, una tarea de autosupervisión que no requiere etiquetas humanas y puede escalar a cualquier cantidad de texto.
+
+GPT-2~\cite{radford2019gpt2} (2019) escala esta misma arquitectura a 1.5B parámetros entrenados sobre 40GB de texto web curado (WebText), demostrando que el mismo paradigma producía capacidades cualitativamente superiores al aumentar escala. GPT-2 popularizó el concepto de \textit{zero-shot generalization}: el modelo podía realizar tareas de traducción, resumen y pregunta-respuesta sin entrenamiento específico, simplemente recibiendo el contexto como prompt.
+
+En paralelo, Google publicó BERT~\cite{devlin2018bert} (2018), que utilizó un Transformer \textit{encoder} bidireccional preentrenado mediante masked language modeling. BERT demostró que la dirección de la atención importa: mientras GPT predice tokens futuros (unidireccional), BERT atiende a todo el contexto simultáneamente (bidireccional), siendo más efectivo para tareas de clasificación y comprensión, pero no apto para generación de texto.
+
+\subsubsection{GPT-3 y la Escala como Estrategia}
+
+GPT-3~\cite{brown2020gpt3} (2020) escala el paradigma GPT a 175B parámetros entrenados sobre 570GB de texto (Common Crawl, BooksCorpus, WebText, Wikipedia). El salto cualitativo fue el descubrimiento de \textit{capacidades emergentes}: habilidades que no existen en modelos pequeños pero aparecen de forma abrupta al superar ciertos umbrales de escala, como razonamiento aritmético de múltiples pasos, analogías y generación de código. GPT-3 también estableció el paradigma \textit{few-shot}: con solo 2--5 ejemplos en el prompt, el modelo puede resolver tareas completamente nuevas sin actualizar sus pesos.
+
+La arquitectura interna de GPT-3 es idéntica a GPT-1 y GPT-2 (Transformer decoder con atención causal), pero con 96 capas, $d_{model}=12.288$ y 96 cabezas de atención. Esto confirmó que la arquitectura Transformer decoder era suficientemente expresiva --- el factor limitante era la escala de datos y parámetros, no la arquitectura en sí.
+
+\subsubsection{Leyes de Escala y el Movimiento SLM}
+
+Hoffmann et al.~\cite{hoffmann2022chinchilla} establecieron en 2022 las \textit{leyes de escala de Chinchilla}: dado un presupuesto computacional fijo, lo óptimo es entrenar un modelo de tamaño $N$ sobre $20N$ tokens (ratio 20:1). Esto implicó que modelos como GPT-3 estaban \textit{infraentrenados} en datos relativos a su tamaño, y que modelos más pequeños entrenados sobre más tokens podían superar a modelos más grandes con menos datos.
+
+Este descubrimiento catalizó el movimiento hacia los \textit{Small Language Models} (SLM): modelos de menos de 3--7B parámetros entrenados sobre 1--10T tokens. Investigaciones como \textit{``Textbooks Are All You Need''}~\cite{gunasekar2023textbooks} demostraron que la \textit{calidad} de los datos puede compensar la cantidad: Phi-3~\cite{abdin2024phi3} (Microsoft, 3.8B parámetros, 3.3T tokens de datos sintéticos de alta calidad) alcanza rendimiento comparable a modelos 10 veces más grandes en benchmarks de razonamiento. Mistral 7B~\cite{jiang2023mistral} introdujo además optimizaciones de inferencia (GQA, Sliding Window Attention) que redujeron los requisitos de VRAM sin sacrificar calidad.
+
+\subsubsection{SmolLM2-135M: Referente Directo de Este Trabajo}
+
+La familia SmolLM2~\cite{allal2025smollm2}, publicada por Hugging Face en 2025, lleva el paradigma SLM al extremo de la eficiencia. El modelo SmolLM2-135M cuenta con 135M de parámetros distribuidos en 30 capas Transformer decoder ($d_{model}=576$, 9 cabezas de atención, contexto de 8.192 tokens, vocabulario de 49.152 tokens) y fue entrenado sobre $\sim$2 billones de tokens de FineWeb-Edu, DCLM, The Stack y datasets curados propios. Es el referente más directo para el modelo de este TFM por similitud de escala de parámetros:
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{|p{3.2cm}|p{1.7cm}|p{2.2cm}|p{1.8cm}|p{4.2cm}|}
+\hline
+\textbf{Modelo} & \textbf{Parámetros} & \textbf{Tokens entren.} & \textbf{Contexto} & \textbf{Arquitectura} \\ \hline
+SmolLM2-135M~\cite{allal2025smollm2} & 135M & $\sim$2T & 8.192 & Transformer decoder \\ \hline
+Phi-3-mini~\cite{abdin2024phi3} & 3,8B & 3,3T & 4.096 / 128K & Transformer decoder \\ \hline
+Mistral-7B~\cite{jiang2023mistral} & 7B & $>$1T & 32K & Transformer + GQA \\ \hline
+\textbf{TFM-SLM (este trabajo)} & \textbf{167M} & \textbf{713M} & \textbf{1.024} & \textbf{Híbrido Transformer-GRU} \\ \hline
+\end{tabular}
+\caption{Comparativa de modelos de lenguaje de referencia. La diferencia en tokens de entrenamiento es el factor determinante para las capacidades generativas emergentes.}
+\label{tab:slm_comparison}
+\end{table}
+
+La diferencia de tres órdenes de magnitud entre SmolLM2-135M ($\sim$2T tokens) y este TFM (713M tokens) explica la brecha cualitativa en generación libre, independientemente de las diferencias arquitectónicas. Las leyes de Chinchilla prescriben 3.340M de tokens para un modelo de 167M de parámetros; SmolLM2-135M supera ese umbral en un factor 600.
+
+% ---------------------------------------------------------------
+\subsection{Tokenización: El Puente entre Texto y Modelo}
+
+Antes de que un modelo de lenguaje procese texto, este debe convertirse en secuencias de enteros discretos --- tokens. El tokenizador es el componente que realiza esta conversión y define el vocabulario sobre el que el modelo opera. Su elección tiene impacto directo en la eficiencia del entrenamiento, la cobertura lingüística y el comportamiento ante texto fuera de distribución.
+
+\subsubsection{Estrategias de Tokenización}
+
+Existen tres paradigmas principales:
+
+\begin{enumerate}
+    \item \textbf{Tokenización por palabras}: cada palabra es un token. Vocabularios grandes ($>$100k), pero genera tokens desconocidos ante palabras raras, morfología flexiva o código. Prácticamente abandonada en LLMs modernos.
+
+    \item \textbf{Tokenización por caracteres}: cada carácter es un token. Vocabulario mínimo ($\sim$256), sin tokens desconocidos, pero secuencias muy largas y aprendizaje lento de semántica léxica.
+
+    \item \textbf{Tokenización por subpalabras}: compromiso entre los dos anteriores. Las unidades frecuentes se representan como tokens completos; las raras se descomponen en subunidades. Es el estándar en todos los LLMs modernos.
+\end{enumerate}
+
+\subsubsection{Byte-Pair Encoding (BPE)}
+
+BPE~\cite{sennrich2016bpe} es el algoritmo de tokenización subpalabra más extendido, utilizado por la familia GPT y por este TFM. El algoritmo parte de un vocabulario inicial de caracteres y de forma iterativa fusiona el par de tokens contiguo más frecuente en el corpus, añadiendo la fusión al vocabulario. El proceso se repite hasta alcanzar el tamaño de vocabulario deseado.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.82\textwidth]{images/diagrams_estado_arte/bpe_tokenization.pdf}
+    \caption{Proceso BPE aplicado a \texttt{"transformers"}. Partiendo de caracteres individuales, el algoritmo fusiona iterativamente los pares más frecuentes del corpus (\texttt{er}, \texttt{tr}, \texttt{ans}\ldots) hasta producir tokens subpalabra compactos. El resultado final depende del corpus de entrenamiento del tokenizador.}
+    \label{fig:bpe_tokenization}
+\end{figure}
+
+El tokenizador GPT-2 --- empleado en este trabajo --- aplica BPE a nivel de bytes (\textit{Byte-Level BPE}): opera sobre la representación UTF-8 del texto, garantizando cobertura universal de cualquier carácter Unicode sin tokens desconocidos. Su vocabulario de 50.257 tokens incluye representaciones eficientes tanto para palabras comunes en inglés como para código Python, siendo adecuado para la mezcla de datos conversacionales e instructivos utilizada.
+
+\subsubsection{WordPiece y SentencePiece}
+
+\textbf{WordPiece} (usado por BERT~\cite{devlin2018bert}) es similar a BPE pero utiliza la verosimilitud del modelo de lenguaje en lugar de la frecuencia de pares como criterio de fusión. Favorece vocabularios más lingüísticamente motivados pero es más costoso de entrenar.
+
+\textbf{SentencePiece} (usado por T5, LLaMA~\cite{touvron2023llama}) opera directamente sobre el stream de caracteres sin presegmentación por espacios, siendo más robusto para idiomas sin separación clara de palabras (chino, japonés) y para texto con formato irregular. LLaMA utiliza SentencePiece con vocabulario de 32.000 tokens, mientras que LLaMA 3 amplía a 128.000 para mejor cobertura multilingüe.
+
+La elección del tokenizador afecta al ratio de compresión (tokens por carácter), que impacta directamente en el coste de entrenamiento: un tokenizador más eficiente representa el mismo texto con menos tokens, reduciendo el coste de la atención $O(L^2)$ y permitiendo cubrir más texto con el mismo presupuesto computacional.
+
+% ---------------------------------------------------------------
 \subsection{Arquitecturas Híbridas y Recurrencia Moderna}
 
-Para mitigar las limitaciones del Transformer, han resurgido las arquitecturas basadas en recurrencia, pero con enfoques modernos. Las \textit{Gated Recurrent Units} (GRU)~\cite{cho2014learning} ofrecen un manejo eficiente de secuencias con un estado oculto de tamaño fijo, eliminando el coste cuadrático.
+Las limitaciones del Transformer puro motivaron el resurgimiento de arquitecturas basadas en recurrencia con enfoques modernos. Investigaciones recientes como Mamba~\cite{gu2023mamba} han propuesto modelos de espacio de estados (\textit{State Space Models}, SSM) que logran un rendimiento comparable a los Transformers pero con inferencia de tiempo lineal $O(L)$. Mamba elimina la atención por completo: un estado selectivo gestiona tanto patrones locales como globales mediante puertas de selección que deciden qué información retener en cada paso. La tendencia actual es la \textbf{hibridación}: combinar capas de atención para capturar relaciones globales con capas recurrentes o lineales para mantener la eficiencia secuencial.
 
-Investigaciones recientes como Mamba~\cite{gu2023mamba} han propuesto modelos de espacio de estados (\textit{State Space Models}) que logran un rendimiento comparable a los Transformers pero con inferencia de tiempo lineal. La tendencia actual, y el núcleo de este TFM, es la hibridación: combinar capas de atención para capturar relaciones globales con capas recurrentes o lineales para mantener la eficiencia secuencial.
+Dentro de este espacio, existen dos estrategias de hibridación claramente diferenciadas:
 
-Esta hibridación se ha visto facilitada por la evolución de los ecosistemas de software, específicamente con la transición de la librería \textit{Transformers} de Hugging Face hacia la versión 5. Mientras que las versiones precedentes (v4.x) requerían implementaciones manuales complejas para integrar componentes recurrentes en el grafo de computación del Transformer, la versión 5 introduce abstracciones nativas para modelos de espacio de estados y arquitecturas secuenciales no atencionales. Estas mejoras permiten una gestión optimizada de la caché de inferencia (KV Cache) y una integración transparente de capas GRU dentro del flujo autorregresivo, garantizando que el modelo mantenga la compatibilidad con herramientas de optimización y despliegue estándar del sector.
+\begin{enumerate}
+    \item \textbf{Hibridación por alternancia (Jamba~\cite{lieber2024jamba})}: los bloques Transformer y Mamba se alternan en la profundidad de la red. Cada capa contiene exclusivamente un mecanismo: unas capas aplican atención, otras aplican SSM. La hibridación ocurre a escala arquitectónica global pero no dentro de cada bloque individual.
+
+    \item \textbf{Hibridación por integración (este TFM)}: cada bloque contiene simultáneamente un GRU y una Multi-Head Attention, procesados en serie sobre la misma representación. Cada capa aplica primero recurrencia local (GRU) y luego atención global (MHA), combinando ambas perspectivas antes de pasar al bloque siguiente.
+\end{enumerate}
+
+La primera estrategia es más eficiente por capa (cada capa ejecuta un solo mecanismo), pero implica que las capas recurrentes no ven atención y viceversa. La segunda es más costosa por bloque pero extrae mayor densidad de información en cada paso, lo que la hace especialmente adecuada para modelos con pocas capas (12 en este trabajo frente a las 30 de SmolLM2-135M o las 32 de Jamba) donde cada bloque debe compensar la menor profundidad con mayor riqueza de procesamiento.

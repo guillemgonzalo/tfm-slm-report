@@ -1,4 +1,166 @@
-\section{Anexo: Configuración del Backend}
-\label{sec:anexo_setup_backend}
+\section{Anexo: Guía Rápida de Comandos}
+\label{sec:anexo_commands}
 
-% \markdownInput{markdowns/SETUP_BACKEND.md}
+Esta guía contiene los comandos esenciales para gestionar la infraestructura, el despliegue y el entrenamiento del SLM.
+
+% ---------------------------------------------------------------
+\subsection{1. Despliegue Local → S3 (Mac)}
+
+\textit{Ejecutar desde la carpeta raíz del proyecto (\texttt{tfm-slm/}) en el ordenador local.}
+
+\begin{lstlisting}[language=bash, caption={Modos de despliegue con deploy.py.}]
+# Opcion 1: Modo TRAINING (descarga -> procesa -> entrena con GPU)
+echo "1" | python3 deploy.py
+
+# Opcion 2: Modo INFERENCE (construye imagen, corre chat en EC2)
+echo "2" | python3 deploy.py
+\end{lstlisting}
+
+\textbf{Qué hace \texttt{deploy.py}:}
+\begin{itemize}
+    \item Archiva código (sin \texttt{\_\_pycache\_\_}, \texttt{.git}, datasets)
+    \item Sube ZIP al bucket S3 \texttt{tfm-slm-code}
+    \item Verifica que el repositorio ECR existe
+    \item Actualiza \texttt{terraform.tfvars} con el modo seleccionado
+\end{itemize}
+
+% ---------------------------------------------------------------
+\subsection{2. Gestión de Infraestructura (Terraform)}
+
+\textit{Ejecutar desde la carpeta \texttt{app/terraform/} en el ordenador local.}
+
+\begin{lstlisting}[language=bash, caption={Comandos Terraform para gestión de la infraestructura.}]
+# Primera vez solamente (crea S3 backend para estado)
+terraform init
+
+# Ver cambios pendientes antes de aplicar
+terraform plan
+
+# Desplegar EC2 (descarga codigo, construye Docker con GPU)
+terraform apply -auto-approve -lock=false
+
+# Obtener IP publica de EC2
+terraform output ec2_public_ip
+
+# Destruir todo (para ahorrar costes)
+terraform destroy -auto-approve -lock=false
+\end{lstlisting}
+
+% ---------------------------------------------------------------
+\subsection{3. Monitorización del Build y Training en EC2}
+
+\textit{Ejecutar desde el Mac local (donde esté \texttt{tfm-slm.pem}).}
+
+\begin{lstlisting}[language=bash, caption={Monitor en vivo del proceso de build y entrenamiento.}]
+# Monitor en vivo (esperar ~5-10 min para Docker build + training)
+ssh -i "tfm-slm.pem" ec2-user@<IP> tail -f /var/log/user-data.log
+
+# Si necesitas forzar nuevo build (borra imagen local)
+ssh -i "tfm-slm.pem" ec2-user@<IP> docker rmi $(<ID_IMAGEN>) -f
+\end{lstlisting}
+
+% ---------------------------------------------------------------
+\subsection{4. Debugging dentro de EC2}
+
+\begin{lstlisting}[language=bash, caption={Comandos de debugging dentro de la instancia EC2.}]
+# Ver contenedor activo
+docker ps
+
+# Ver logs del contenedor en vivo
+docker logs -f <ID_CONTENEDOR>
+
+# Ver estado GPU/VRAM
+nvidia-smi
+nvidia-smi -l 1    # Actualiza cada segundo
+
+# Ver CloudInit logs si Docker no esta levantado aun
+sudo tail -f /var/log/cloud-init-output.log
+\end{lstlisting}
+
+% ---------------------------------------------------------------
+\subsection{5. Conexión SSH}
+
+\begin{lstlisting}[language=bash, caption={Conexión SSH a la instancia EC2.}]
+# Solo primera vez: permisos correctos para .pem
+chmod 400 tfm-slm.pem
+
+# Conectar a instancia
+ssh -i "tfm-slm.pem" ec2-user@<IP_PUBLICA>
+
+# Limpiar host key si cambio la IP
+ssh-keygen -R <IP_PUBLICA>
+\end{lstlisting}
+
+% ---------------------------------------------------------------
+\subsection{6. Deploy y Ejecución de Inferencia (Chat)}
+
+\subsubsection{Opción A: Desde Mac (flujo completo)}
+
+\begin{lstlisting}[language=bash, caption={Flujo completo de despliegue e inferencia desde Mac.}]
+# PASO 1 -- Mac: subir codigo y provisionar EC2
+echo "2" | python3 deploy.py
+cd app/terraform && terraform apply -auto-approve -lock=false
+
+# PASO 2 -- Esperar build (~10-15 min con Flash Attention)
+ssh -i "tfm-slm.pem" ec2-user@<IP>
+sudo tail -f /var/log/cloud-init-output.log
+# Esperar hasta ver: "Image pushed to ECR"
+
+# PASO 3 -- Lanzar chat interactivo (desde dentro de EC2 por SSH)
+AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.eu-south-2.amazonaws.com/tfm-slm:latest"
+
+docker run --gpus all -it \
+  -e MODE=inference \
+  -v ~/.aws/credentials:/root/.aws/credentials:ro \
+  "$IMAGE_URI"
+# Descarga checkpoint desde S3 automaticamente
+# Escribe 'salir' para terminar
+\end{lstlisting}
+
+\subsubsection{Opción B: Imagen ya construida en ECR}
+
+\begin{lstlisting}[language=bash, caption={Lanzar chat cuando la imagen ya existe en ECR.}]
+AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.eu-south-2.amazonaws.com/tfm-slm:latest"
+
+aws ecr get-login-password --region eu-south-2 | \
+  docker login --username AWS --password-stdin \
+  "$AWS_ACCOUNT_ID.dkr.ecr.eu-south-2.amazonaws.com"
+
+docker pull "$IMAGE_URI"
+
+docker run --gpus all -it \
+  -e MODE=inference \
+  -v ~/.aws/credentials:/root/.aws/credentials:ro \
+  "$IMAGE_URI"
+\end{lstlisting}
+
+% ---------------------------------------------------------------
+\subsection{7. Benchmarking}
+
+\begin{lstlisting}[language=bash, caption={Ejecución del benchmark en local y en EC2.}]
+# Local (Mac)
+uv run tfm-slm-benchmark
+# Resultados en: output/benchmark_hybrid.json
+
+# En EC2 (modo automatico)
+echo "3" | python3 deploy.py
+cd app/terraform && terraform apply -auto-approve -lock=false
+ssh -i "tfm-slm.pem" ec2-user@<IP> tail -f /var/log/user-data.log
+# EC2 descarga dataset + checkpoint, ejecuta benchmark y sube JSON a S3
+\end{lstlisting}
+
+% ---------------------------------------------------------------
+\subsection{8. Pausar y Reanudar (Ahorro de Costes)}
+
+\begin{lstlisting}[language=bash, caption={Ciclo de pausa y reanudacion para optimizar costes Spot.}]
+# Pausar (destruye EC2, S3 y ECR persisten)
+terraform destroy -auto-approve -lock=false
+
+# Verificar que se destruyo
+terraform output ec2_public_ip    # Debe estar vacio
+
+# Reanudar
+terraform apply -auto-approve -lock=false
+\end{lstlisting}

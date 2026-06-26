@@ -1,0 +1,8 @@
+# Solo primera vez: permisos correctos para .pem
+chmod 400 tfm-slm.pem
+
+# Conectar a instancia
+ssh -i "tfm-slm.pem" ec2-user@<IP_PUBLICA>
+
+# Limpiar host key si cambió IP
+ssh-keygen -R <IP_PUBLICA>

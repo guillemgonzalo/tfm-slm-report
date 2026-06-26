@@ -1,0 +1,50 @@
+\documentclass[border=8pt]{standalone}
+\usepackage{pgfgantt}
+\usepackage{xcolor}
+
+\begin{document}
+\begin{ganttchart}[
+    hgrid,
+    vgrid,
+    title label font=\small,
+    bar label font=\small,
+    group label font=\small\bfseries,
+    bar/.append style={fill=blue!30, draw=blue!60},
+    group/.append style={fill=gray!50, draw=gray!70},
+    milestone/.append style={fill=red!60, draw=red!80, xscale=0.6},
+    bar label node/.append style={align=right},
+    group label node/.append style={align=right},
+    x unit=1.1cm,
+    y unit title=0.6cm,
+    y unit chart=0.65cm
+]{1}{12}
+    \gantttitle{Mes 1}{4}
+    \gantttitle{Mes 2}{4}
+    \gantttitle{Mes 3}{4} \\
+    \gantttitlelist{1,...,12}{1} \\
+
+    \ganttgroup{Diseño}{1}{2} \\
+    \ganttbar{Investigacion y estado del arte}{1}{1} \\
+    \ganttbar{Diseno arquitectura hibrida}{1}{2} \\
+
+    \ganttgroup{Implementacion}{2}{6} \\
+    \ganttbar{HybridBlock + pipeline de datos}{2}{3} \\
+    \ganttbar{1er entreno --- NVIDIA L4}{3}{4} \\
+    \ganttbar{Mejoras iterativas arquitectura}{4}{5} \\
+    \ganttbar{2do entreno --- NVIDIA L40S}{5}{6} \\
+
+    \ganttgroup{Entrenamiento final}{6}{8} \\
+    \ganttbar{3er entreno --- RTX PRO 6000}{6}{7} \\
+    \ganttbar{Benchmarking (300K muestras)}{7}{8} \\
+
+    \ganttgroup{MLOps e Infraestructura}{7}{10} \\
+    \ganttbar{Terraform + CI/CD + Docker}{7}{9} \\
+    \ganttbar{Kubernetes + ArgoCD}{9}{10} \\
+
+    \ganttgroup{Documentacion}{9}{12} \\
+    \ganttbar{Analisis de resultados}{9}{10} \\
+    \ganttbar{Redaccion TFM}{10}{12} \\
+
+    \ganttmilestone{Entrega}{12}
+\end{ganttchart}
+\end{document}

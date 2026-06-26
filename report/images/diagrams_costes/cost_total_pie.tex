@@ -1,0 +1,23 @@
+\documentclass[border=8pt]{standalone}
+\usepackage{pgf-pie}
+\usepackage{xcolor}
+
+\definecolor{humancolor}{RGB}{52,120,190}
+\definecolor{gpucolor}{RGB}{190,80,50}
+\definecolor{s3color}{RGB}{34,150,100}
+
+\begin{document}
+\begin{tikzpicture}
+\pie[
+    radius=3.0,
+    color={humancolor, gpucolor, s3color},
+    text=legend,
+    after number=\%,
+    every label/.style={font=\small}
+]{
+    95.9/Coste humano --- 4.876 EUR,
+    4.0/Infraestructura GPU --- 204 EUR,
+    0.1/Almacenamiento S3 --- \textless{}5 EUR
+}
+\end{tikzpicture}
+\end{document}
