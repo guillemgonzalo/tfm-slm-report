@@ -28,6 +28,13 @@ En paralelo, el campo del modelado del lenguaje operaba sobre modelos estadísti
 
 La solución natural fue combinar la capacidad de aprendizaje de representaciones de las redes neuronales con un mecanismo de \textit{estado interno} que propagara información entre pasos temporales. Así nacieron las Redes Neuronales Recurrentes (RNN), introducidas formalmente por Rumelhart et al.~\cite{rumelhart1986learning} y Jordan (1986), y popularizadas para el modelado del lenguaje por Elman~\cite{elman1990finding} (1990). La idea central es elegante: reutilizar los mismos pesos en cada paso temporal y mantener un vector de estado oculto que acumule contexto de la secuencia hasta el punto actual.
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.72\textwidth]{images/state_of_the_art/recurrent_neural_network.png}
+    \caption{Red Neuronal Recurrente}
+    \label{fig:recurrent_neural_network}
+\end{figure}
+
 % ---------------------------------------------------------------
 \subsection{Fundamentos: Redes Neuronales Recurrentes (RNN)}
 

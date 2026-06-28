@@ -1,69 +1,84 @@
 \documentclass[tikz, border=10pt]{standalone}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta, positioning, shapes.geometric, calc}
+\usetikzlibrary{arrows.meta, shapes.geometric, calc}
 
 \begin{document}
 \begin{tikzpicture}[
-    gate/.style={draw, circle, minimum size=0.75cm, thick, fill=orange!20},
-    op/.style={draw, circle, minimum size=0.65cm, thick, fill=gray!15},
-    tanh/.style={draw, circle, minimum size=0.75cm, thick, fill=green!20},
+    gate/.style={draw, circle, minimum size=0.78cm, thick, fill=orange!20},
+    op/.style={draw, circle, minimum size=0.68cm, thick, fill=gray!15},
+    tnh/.style={draw, circle, minimum size=0.78cm, thick, fill=green!20},
     arr/.style={-{Stealth[length=5pt]}, thick},
     font=\small,
     lbl/.style={font=\footnotesize}
 ]
 
-% ---- Cell state (top horizontal line) ----
-\draw[arr, line width=1.4pt, blue!70!black]
-    (-0.8, 3.2) -- node[above, lbl, blue!70!black]{$C_{t-1}$} (1.6, 3.2)
-                -- node[above, lbl, blue!70!black]{$C_t$}      (5.6, 3.2);
+%% ─── CELL STATE LINE (y=4.8) ─────────────────────────────────────────
+%%  C_{t-1} → ×(forget) → +(← i_t⊙C̃_t) → C_t →
+\node[op, fill=orange!10] (mulf) at (2.0, 4.8) {$\times$};
+\node[op]                 (addc) at (4.3, 4.8) {$+$};
 
-% ---- Forget gate (left) ----
-\node[gate] (fg) at (1.0, 1.8) {$\sigma$};
-\node[lbl, text=orange!80!black] at (1.0, 1.1) {forget};
-\draw[arr] (fg) -- (1.0, 3.2);  % output up to cell state multiply
-\node[op, fill=orange!10] (mulf) at (1.0, 3.2) {$\times$};
+\draw[arr, line width=1.6pt, blue!70!black]
+    (-1.0, 4.8) --node[above,lbl,blue!70!black]{$C_{t-1}$} (mulf);
+\draw[arr, line width=1.6pt, blue!70!black]
+    (mulf) -- (addc);
+\draw[arr, line width=1.6pt, blue!70!black]
+    (addc) --node[above,lbl,blue!70!black]{$C_t$} (8.0, 4.8);
 
-% ---- Input gate + candidate ----
-\node[gate] (ig) at (2.8, 1.8) {$\sigma$};
-\node[lbl, text=orange!80!black] at (2.8, 1.1) {input};
-\node[tanh] (cand) at (2.3, 0.2) {$\tanh$};
-\node[lbl, text=green!60!black] at (2.3, -0.55) {cand.};
+%% ─── GATES ROW (y=2.2) ───────────────────────────────────────────────
+\node[gate] (fg)   at (2.0, 2.2) {$\sigma$};
+\node[lbl, text=orange!80!black] at (2.0, 1.45) {forget};
 
-\node[op, fill=orange!10] (mul_i) at (2.8, 3.2) {$\times$};
-\node[op] (add_c) at (2.0, 3.2) {$+$};
+\node[gate] (ig)   at (3.5, 2.2) {$\sigma$};
+\node[lbl, text=orange!80!black] at (3.5, 1.45) {input};
 
-\draw[arr] (ig) -- (mul_i);
-\draw[arr] (cand) -- (2.3, 3.2) -- (mul_i);
-\draw[arr] (mul_i) -- (add_c);
-\draw[arr] (mulf) -- (add_c);
+\node[tnh]  (cand) at (4.8, 2.2) {$\tanh$};
+\node[lbl, text=green!60!black]  at (4.8, 1.45) {cand.};
 
-% ---- Output gate ----
-\node[gate] (og) at (4.5, 1.8) {$\sigma$};
-\node[lbl, text=orange!80!black] at (4.5, 1.1) {output};
-\node[tanh] (tanh_out) at (4.5, 3.2) {$\tanh$};
-\node[op] (mul_o) at (5.2, 2.4) {$\times$};
+\node[gate] (og)   at (6.3, 2.2) {$\sigma$};
+\node[lbl, text=orange!80!black] at (6.3, 1.45) {output};
 
-\draw[arr] (og) -- (mul_o);
-\draw[arr] (tanh_out) -- (mul_o);
-\draw[arr] (add_c) -- (tanh_out);
+%% ─── forget gate → × cell state ─────────────────────────────────────
+\draw[arr] (fg) -- (mulf);
 
-% ---- h_t output ----
-\draw[arr] (mul_o) -- node[right, lbl]{$h_t$} (5.2, 1.0);
+%% ─── i_t ⊙ C̃_t (y=3.5) → feeds + on cell state ─────────────────────
+%%  ig and cand converge diagonally to mul_ic; result rises to addc
+\node[op, fill=orange!10] (mul_ic) at (4.15, 3.5) {$\times$};
+\draw[arr] (ig)     -- (mul_ic);
+\draw[arr] (cand)   -- (mul_ic);
+\draw[arr] (mul_ic) -- (addc);
 
-% ---- Input h_{t-1} and x_t ----
-\draw[arr] (-0.8, 1.8) -- node[above, lbl]{$h_{t-1}$} (fg);
-\draw[arr] (fg) -- (ig);
-\draw[arr] (ig) -- (og);
+%% ─── C_t branch → tanh(C_t) → ×(output gate) → h_t ─────────────────
+%%  tanh_c branches DOWNWARD from C_t, not on the blue line itself
+\coordinate (ctbr) at (6.3, 4.8);
+\filldraw[black] (ctbr) circle (2pt);
 
-\draw[arr] (0.3, -0.8) -- node[left, lbl]{$x_t$} (0.3, 0.2) -- (cand);
-\draw (0.3, 0.2) -- (0.3, 1.8);
-\filldraw[black] (0.3, 0.2) circle (1.5pt);
-\filldraw[black] (0.3, 1.8) circle (1.5pt);
+\node[tnh] (tanh_c) at (6.3, 3.5) {$\tanh$};
+\node[op]  (mul_o)  at (7.2, 2.8) {$\times$};
 
-% ---- Border box ----
-\draw[dashed, rounded corners=6pt, gray]
-    (-0.3, -0.9) rectangle (5.7, 3.9);
-\node[gray, font=\small\itshape] at (2.7, 4.25) {Celda LSTM};
+\draw[arr] (ctbr)   -- (tanh_c);
+\draw[arr] (tanh_c) -- (mul_o);
+\draw[arr] (og)     -- (mul_o);
+\draw[arr] (mul_o)  --node[right,lbl]{$h_t$} (7.2, 1.5);
+
+%% ─── h_{t-1} BUS (y=2.8, horizontal) ───────────────────────────────
+%%  Arrives from left, distributes to all 4 gates/cand via branch dots
+\draw[arr, thick] (-1.0, 2.8) --node[above,lbl]{$h_{t-1}$} (0.5, 2.8);
+\filldraw[black] (0.5, 2.8) circle (1.8pt);
+\draw[thick] (0.5, 2.8) -- (6.7, 2.8);
+
+\filldraw[black] (2.0, 2.8) circle (1.8pt);  \draw[arr] (2.0, 2.8) -- (fg);
+\filldraw[black] (3.5, 2.8) circle (1.8pt);  \draw[arr] (3.5, 2.8) -- (ig);
+\filldraw[black] (4.8, 2.8) circle (1.8pt);  \draw[arr] (4.8, 2.8) -- (cand);
+\filldraw[black] (6.3, 2.8) circle (1.8pt);  \draw[arr] (6.3, 2.8) -- (og);
+
+%% ─── x_t BUS (x=0.5, vertical) ──────────────────────────────────────
+%%  Arrives from below inside the box, joins h_{t-1} bus at (0.5, 2.8)
+\draw[arr, thick] (0.5, 1.1) --node[left,lbl]{$x_t$} (0.5, 2.72);
+
+%% ─── BOUNDING BOX ────────────────────────────────────────────────────
+\draw[dashed, rounded corners=7pt, gray, thick]
+    (-0.8, 0.8) rectangle (7.8, 5.5);
+\node[gray, font=\small\itshape] at (3.5, 5.85) {Celda LSTM};
 
 \end{tikzpicture}
 \end{document}
