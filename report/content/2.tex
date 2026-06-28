@@ -207,6 +207,13 @@ La arquitectura interna de GPT-3 es idéntica a GPT-1 y GPT-2 (Transformer decod
 
 Hoffmann et al.~\cite{hoffmann2022chinchilla} establecieron en 2022 las \textit{leyes de escala de Chinchilla}: dado un presupuesto computacional fijo, lo óptimo es entrenar un modelo de tamaño $N$ sobre $20N$ tokens (ratio 20:1). Esto implicó que modelos como GPT-3 estaban \textit{infraentrenados} en datos relativos a su tamaño, y que modelos más pequeños entrenados sobre más tokens podían superar a modelos más grandes con menos datos.
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.92\textwidth]{images/state_of_the_art/chinchilla_scaling.png}
+    \caption{Leyes de escala de Chinchilla~\cite{hoffmann2022chinchilla}. \textbf{Izquierda}: contornos IsoLoss en espacio FLOPs--tamaño de modelo. La línea azul es la \textit{frontera eficiente}: la combinación óptima de parámetros y tokens para cada presupuesto computacional. \textbf{Derecha}: curvas IsoFLOP — para un presupuesto fijo, existe un tamaño de modelo óptimo que minimiza la pérdida. Ambos análisis convergen en la misma conclusión: parámetros y tokens deben escalar proporcionalmente.}
+    \label{fig:chinchilla_scaling}
+\end{figure}
+
 Este descubrimiento catalizó el movimiento hacia los \textit{Small Language Models} (SLM): modelos de menos de 3--7B parámetros entrenados sobre 1--10T tokens. Investigaciones como \textit{``Textbooks Are All You Need''}~\cite{gunasekar2023textbooks} demostraron que la \textit{calidad} de los datos puede compensar la cantidad: Phi-3~\cite{abdin2024phi3} (Microsoft, 3.8B parámetros, 3.3T tokens de datos sintéticos de alta calidad) alcanza rendimiento comparable a modelos 10 veces más grandes en benchmarks de razonamiento. Mistral 7B~\cite{jiang2023mistral} introdujo además optimizaciones de inferencia (GQA, Sliding Window Attention) que redujeron los requisitos de VRAM sin sacrificar calidad.
 
 \subsubsection{SmolLM2-135M: Referente Directo de Este Trabajo}
@@ -262,9 +269,15 @@ El tokenizador GPT-2 --- empleado en este trabajo --- aplica BPE a nivel de byte
 
 \subsubsection{WordPiece y SentencePiece}
 
-\textbf{WordPiece} (usado por BERT~\cite{devlin2018bert}) es similar a BPE pero utiliza la verosimilitud del modelo de lenguaje en lugar de la frecuencia de pares como criterio de fusión. Favorece vocabularios más lingüísticamente motivados pero es más costoso de entrenar.
+\textbf{WordPiece}~\cite{huggingface2024llmcourse} (usado por BERT~\cite{devlin2018bert}, DistilBERT, MobileBERT) es similar a BPE en la fase de entrenamiento pero difiere en dos aspectos clave. Primero, el criterio de fusión no es la frecuencia bruta del par sino una puntuación que penaliza los pares cuyas componentes son individualmente frecuentes:
 
-\textbf{SentencePiece} (usado por T5, LLaMA~\cite{touvron2023llama}) opera directamente sobre el stream de caracteres sin presegmentación por espacios, siendo más robusto para idiomas sin separación clara de palabras (chino, japonés) y para texto con formato irregular. LLaMA utiliza SentencePiece con vocabulario de 32.000 tokens, mientras que LLaMA 3 amplía a 128.000 para mejor cobertura multilingüe.
+\begin{equation}
+\text{score}(A, B) = \frac{\text{freq}(AB)}{\text{freq}(A) \times \text{freq}(B)}
+\end{equation}
+
+Esto evita que subpalabras comunes dominen las fusiones y produce vocabularios más lingüísticamente motivados. Segundo, WordPiece no almacena reglas de fusión sino el vocabulario final, y aplica una estrategia \textit{greedy longest-match-first} en la tokenización: busca el subtoken más largo desde el inicio de la palabra que exista en el vocabulario y repite hasta cubrir toda la palabra. Si alguna porción no puede tokenizarse, la palabra entera se marca como \texttt{[UNK]}, a diferencia de BPE que solo marca como desconocidos los caracteres individuales fuera de vocabulario. Los caracteres internos llevan el prefijo \texttt{\#\#} para distinguirlos de tokens iniciales (\textit{e.g.}, \texttt{"word"} → \texttt{w \#\#o \#\#r \#\#d}).
+
+\textbf{SentencePiece}~\cite{kudo2018sentencepiece} (usado por T5, LLaMA~\cite{touvron2023llama}, Gemma) es un tokenizador subpalabra independiente del idioma que opera directamente sobre el stream Unicode bruto, sin presegmentación por espacios. Esto lo distingue de BPE y WordPiece, que asumen tokenización previa por espacios. SentencePiece codifica los espacios como el meta-símbolo \texttt{<U+2581>}, lo que permite una detokenización determinista y sin pérdida mediante simple concatenación de cadenas. Soporta dos algoritmos de segmentación: BPE y el modelo de lenguaje \textit{unigram}, que realiza segmentación probabilística minimizando la pérdida de verosimilitud. La independencia del idioma lo hace especialmente robusto para lenguas sin separación explícita de palabras (chino, japonés, coreano) y para texto con formato irregular. LLaMA utiliza SentencePiece con vocabulario de 32.000 tokens, mientras que LLaMA 3 amplía a 128.000 para mejor cobertura multilingüe; Gemma 3 emplea BPE vía SentencePiece con vocabulario de 256.000 tokens.
 
 La elección del tokenizador afecta al ratio de compresión (tokens por carácter), que impacta directamente en el coste de entrenamiento: un tokenizador más eficiente representa el mismo texto con menos tokens, reduciendo el coste de la atención $O(L^2)$ y permitiendo cubrir más texto con el mismo presupuesto computacional.
 
