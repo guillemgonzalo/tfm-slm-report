@@ -4,6 +4,31 @@
 Este capítulo traza la evolución de las arquitecturas de modelado del lenguaje desde sus orígenes en las redes recurrentes hasta las arquitecturas híbridas modernas, estableciendo el contexto técnico que motiva la propuesta de este trabajo.
 
 % ---------------------------------------------------------------
+\subsection{Antecedentes Históricos: Del Perceptrón a las Redes Recurrentes}
+
+El modelado computacional del lenguaje tiene sus raíces en los trabajos de McCulloch y Pitts~\cite{mcculloch1943logical} (1943), que formalizaron la primera neurona artificial como una compuerta lógica binaria. Rosenblatt~\cite{rosenblatt1958perceptron} (1958) extendió este concepto al \textit{perceptrón}, una red de una sola capa capaz de aprender a clasificar patrones linealmente separables mediante un algoritmo de ajuste de pesos. Sin embargo, el perceptrón era estático: no tenía noción de tiempo ni de orden, lo que lo hacía incapaz de procesar secuencias.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.72\textwidth]{images/state_of_the_art/perceptron.png}
+    \caption{Arquitectura del perceptrón: entradas $x_1, \ldots, x_n$ ponderadas por pesos $w_1, \ldots, w_n$, suma ponderada y función de activación que produce la predicción $\hat{y}$.}
+    \label{fig:perceptron}
+\end{figure}
+
+El paso hacia las redes multicapa vino con el algoritmo de \textit{backpropagation} popularizado por Rumelhart, Hinton y Williams~\cite{rumelhart1986learning} (1986), que permitió entrenar redes con capas ocultas ajustando pesos mediante el gradiente del error. Esto abrió la puerta al modelado de representaciones más complejas, pero las arquitecturas feedforward seguían siendo incapaces de manejar secuencias de longitud variable: cada entrada se procesaba de forma independiente, sin memoria de entradas anteriores.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.72\textwidth]{images/state_of_the_art/backpropagation.png}
+    \caption{Backpropagation en red multicapa: (1) se calcula el error $\ell(y, \hat{y})$ entre salida predicha y real, (2) el error se propaga hacia atrás a cada neurona, y (3) se ajustan los pesos mediante el gradiente del error.}
+    \label{fig:backpropagation}
+\end{figure}
+
+En paralelo, el campo del modelado del lenguaje operaba sobre modelos estadísticos de $n$-gramas: la probabilidad del siguiente token se estimaba como frecuencia relativa de co-ocurrencia de los últimos $n-1$ tokens en un corpus. Estos modelos eran eficientes pero sufrían de \textit{explosión combinatoria}: el número de posibles $n$-gramas crece exponencialmente con $n$, haciendo imposible capturar dependencias más allá de 3--5 palabras.
+
+La solución natural fue combinar la capacidad de aprendizaje de representaciones de las redes neuronales con un mecanismo de \textit{estado interno} que propagara información entre pasos temporales. Así nacieron las Redes Neuronales Recurrentes (RNN), introducidas formalmente por Rumelhart et al.~\cite{rumelhart1986learning} y Jordan (1986), y popularizadas para el modelado del lenguaje por Elman~\cite{elman1990finding} (1990). La idea central es elegante: reutilizar los mismos pesos en cada paso temporal y mantener un vector de estado oculto que acumule contexto de la secuencia hasta el punto actual.
+
+% ---------------------------------------------------------------
 \subsection{Fundamentos: Redes Neuronales Recurrentes (RNN)}
 
 Las Redes Neuronales Recurrentes introducidas por Rumelhart et al.~\cite{rumelhart1986learning} representan la primera arquitectura capaz de procesar secuencias manteniendo un estado oculto a lo largo del tiempo. En su forma más simple, una RNN vanilla aplica la misma función de transformación recurrentemente:

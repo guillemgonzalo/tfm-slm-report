@@ -18,9 +18,14 @@ El desafío reside en diseñar arquitecturas que capturen las capacidades de mod
 
 \subsection{Problema y Propuesta}
 
-Los Transformers puros, aunque efectivos, requieren múltiples capas de atención para capturar patrones secuenciales, incrementando VRAM y latencia. Las arquitecturas recurrentes (RNN, GRU) son eficientes pero pierden contexto a largo plazo.
+Los dos paradigmas dominantes presentan limitaciones complementarias:
 
-Este trabajo propone una \textbf{arquitectura híbrida que combina Transformer Multi-Head Attention y capas GRU dentro de cada bloque}, permitiendo:
+\begin{itemize}
+    \item \textbf{Transformers puros}: el mecanismo de auto-atención tiene complejidad cuadrática $O(L^2)$ en tiempo y memoria respecto a la longitud de la secuencia $L$. Esto implica un consumo de VRAM prohibitivo para contextos largos y costes de inferencia elevados. Además, los Transformers carecen de un estado de memoria secuencial explícito: la información fluye mediante atención global pero no existe un canal recurrente que acumule estructura local a lo largo de la secuencia.
+    \item \textbf{Arquitecturas recurrentes (RNN, GRU, LSTM)}: procesan la secuencia con coste lineal $O(L)$ y mantienen un estado oculto compacto. Sin embargo, presentan tres limitaciones fundamentales. Primera, el estado oculto es un vector de dimensión fija que debe comprimir toda la historia de la secuencia: cuanto mayor es el contexto, mayor es la pérdida de información por compresión, especialmente para dependencias a más de varios centenares de tokens. Segunda, el procesamiento es estrictamente secuencial —cada paso depende del anterior—, lo que impide la paralelización durante el entrenamiento y penaliza el tiempo de cómputo sobre hardware moderno con miles de núcleos CUDA. Tercera, las RNNs vanilla sufren de \textit{vanishing gradients} durante el backpropagation a través del tiempo (BPTT): aunque LSTM y GRU mitigan este problema mediante compuertas, no lo eliminan completamente en secuencias muy largas.
+\end{itemize}
+
+Este trabajo propone una \textbf{arquitectura híbrida que combina Transformer Multi-Head Attention y capas GRU dentro de cada bloque}, aprovechando las fortalezas de ambos paradigmas y mitigando sus limitaciones individuales:
 
 \begin{itemize}
     \item Captura de dependencias globales vía Multi-Head Attention
@@ -48,7 +53,7 @@ El objetivo principal es diseñar, implementar y validar esta arquitectura híbr
 \textbf{Objetivo 2 --- Validación de Producción:}
 \begin{itemize}
     \item Despliegue en Kubernetes con gestión automatizada mediante ArgoCD
-    \item Análisis de cost-benefit: AWS Spot Instances vs desarrollo local
+    \item Análisis de cost-benefit: AWS EC2 vs desarrollo local
     \item Pipelines de testing automatizados para validación continua
 \end{itemize}
 
@@ -70,8 +75,8 @@ El objetivo principal es diseñar, implementar y validar esta arquitectura híbr
     \item \textbf{Capítulo 6}: Diseño e implementación de la arquitectura híbrida --- estrategia de mezcla de datos, especificación técnica del modelo y configuración del entrenamiento
     \item \textbf{Capítulo 7}: Evaluación y benchmarking --- 10 métricas de calidad, eficiencia y recursos sobre 300.000 muestras
     \item \textbf{Capítulo 8}: Infraestructura cloud --- ecosistema AWS, hardware G6/G6e/G7e, Terraform, optimización de VRAM y progresión de hardware
-    \item \textbf{Capítulo 9}: Análisis de costes --- coste de infraestructura GPU por ciclo de entrenamiento y coste humano equivalente de un ingeniero junior en Data Science
-    \item \textbf{Capítulo 10}: MLOps: despliegue y puesta en producción --- CI/CD, reproducibilidad, Rulesets, testing automatizado, Terraform e infraestructura GitOps con Kubernetes y ArgoCD
+    \item \textbf{Capítulo 9}: MLOps: despliegue y puesta en producción --- CI/CD, reproducibilidad, Rulesets, testing automatizado, Terraform e infraestructura GitOps con Kubernetes y ArgoCD
+    \item \textbf{Capítulo 10}: Análisis de costes --- coste de infraestructura GPU por ciclo de entrenamiento y coste humano equivalente de un ingeniero junior en Data Science
     \item \textbf{Capítulo 11}: Conclusiones y trabajo futuro
     \item \textbf{Anexo A}: Guía rápida de comandos
     \item \textbf{Anexo B}: Configuración del backend
