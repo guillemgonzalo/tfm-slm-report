@@ -150,8 +150,8 @@ La capacidad del Transformer de procesar en paralelo combinada con su capacidad 
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.60\textwidth]{images/diagrams_estado_arte/transformer_enc_dec.pdf}
-    \caption{Arquitectura Transformer encoder-decoder original~\cite{vaswani2017attention}. El encoder transforma la secuencia de entrada en representaciones contextuales densas mediante auto-atención bidireccional. El decoder genera la salida token a token con atención causal (masked) y cross-attention sobre las representaciones del encoder.}
+    \includegraphics[width=0.52\textwidth]{images/state_of_the_art/transformer.png}
+    \caption{Arquitectura Transformer encoder-decoder original~\cite{vaswani2017attention}. Encoder (izquierda): $N$ bloques de Multi-Head Attention bidireccional + Feed-Forward con conexiones residuales. Decoder (derecha): $N$ bloques con Masked Multi-Head Attention causal, cross-attention sobre salidas del encoder, y capa lineal + softmax para predicción del siguiente token.}
     \label{fig:transformer_enc_dec}
 \end{figure}
 
@@ -164,7 +164,21 @@ A pesar de su éxito, los Transformers convencionales presentan un cuello de bot
 
 Para mitigar el coste cuadrático dentro del paradigma Transformer, la comunidad ha desarrollado dos optimizaciones complementarias de adopción generalizada. \textbf{FlashAttention}~\cite{dao2022flashattention} reescribe el cómputo de la atención con consciencia de la jerarquía de memoria GPU (\textit{IO-awareness}): en lugar de materializar la matriz $QK^T \in \mathbb{R}^{L \times L}$ completa en HBM (\textit{High Bandwidth Memory}), el cómputo se divide en bloques que caben en SRAM, reduciendo los accesos a memoria en un factor $O(L/B)$ donde $B$ es el tamaño del bloque. El resultado es matemáticamente idéntico a la atención estándar, pero con uso de memoria $O(L)$ en lugar de $O(L^2)$ y una aceleración práctica de $2$--$4\times$ en GPUs modernas. En este trabajo se utiliza FlashAttention~v2.8.3 instalada mediante wheels precompiladas~\cite{mjun0812flashattentionwheels}, evitando la compilación desde fuente (que requiere $\sim$30 min en instancias AWS sin CUDA toolkit) y reduciendo el tiempo de instalación a menos de un minuto.
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.82\textwidth]{images/state_of_the_art/flash_attention.png}
+    \caption{FlashAttention~\cite{dao2022flashattention}: en lugar de materializar la matriz $QK^T \in \mathbb{R}^{L \times L}$ completa en HBM, el cómputo se divide en bloques (\textit{tiles}) que caben en SRAM. Las flechas indican transferencias HBM$\leftrightarrow$SRAM: la versión estándar requiere $O(L^2)$ lecturas/escrituras; FlashAttention las reduce a $O(L)$, con resultado matemáticamente idéntico.}
+    \label{fig:flash_attention}
+\end{figure}
+
 \textbf{Grouped Query Attention (GQA)}~\cite{ainslie2023gqa} aborda el problema desde la perspectiva del KV Cache: en inferencia autoregresiva, almacenar claves y valores para todas las $h$ cabezas consume una fracción significativa de VRAM que crece con la longitud del contexto. GQA agrupa las $h$ cabezas de consulta en $g$ grupos que comparten un único conjunto de claves y valores ($g < h$), reduciendo el KV Cache en un factor $h/g$ sin pérdida apreciable de calidad. Modelos como Mistral-7B~\cite{jiang2023mistral} y Llama 3 adoptan GQA con $g=8$ cabezas KV frente a $h=32$ cabezas de consulta.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.82\textwidth]{images/state_of_the_art/grouped_query.png}
+    \caption{Comparativa de estrategias de atención multi-cabeza~\cite{ainslie2023gqa}. \textbf{Multi-head} (MHA): cada cabeza de query tiene su propio par K/V — máxima expresividad, mayor KV Cache. \textbf{Grouped-query} (GQA): grupos de queries comparten K/V — reduce KV Cache en factor $h/g$ con pérdida mínima de calidad. \textbf{Multi-query} (MQA): todas las queries comparten un único par K/V — mínimo KV Cache, mayor degradación.}
+    \label{fig:grouped_query}
+\end{figure}
 
 Estas optimizaciones reducen el coste de la atención pero no eliminan su dependencia de $O(L^2)$ en cómputo, ni aportan un mecanismo de memoria secuencial explícita. La integración de capas GRU propuesta en este trabajo es complementaria: mientras FlashAttention y GQA hacen la atención más eficiente, el GRU provee un estado oculto compacto $h \in \mathbb{R}^d$ que captura dependencias locales con coste $O(L)$, sin necesidad de KV Cache.
 

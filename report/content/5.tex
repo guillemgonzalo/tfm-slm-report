@@ -4,7 +4,7 @@
 Este capítulo detalla la aportación técnica central de este TFM: la integración de Transformers y GRU en un único modelo funcional, así como la estrategia de curación de datos y la configuración del entrenamiento desde cero, con comparativa técnica frente al estado del arte.
 
 \subsection{Arquitectura del Modelo: Hybrid Transformer-GRU}
-La innovación técnica central de este modelo, denominado \texttt{tfm-slm}, radica en su arquitectura de bloques híbridos integrados. A diferencia de enfoques que simplemente concatenan capas, cada uno de los 12 bloques del modelo fusiona capacidades globales y secuenciales.
+El modelo \texttt{tfm-slm} sigue el paradigma \textbf{decoder-only} con atención causal: no existe encoder ni cross-attention, y cada token solo puede atender a posiciones anteriores. Este diseño, adoptado por la familia GPT y LLaMA, es el estándar para generación autorregresiva de lenguaje. La innovación técnica central radica en su arquitectura de bloques híbridos integrados: a diferencia de enfoques que simplemente concatenan capas, cada uno de los 12 bloques fusiona capacidades globales y secuenciales dentro del mismo bloque decoder.
 
 \subsubsection{El Bloque Híbrido (HybridBlock)}
 Cada capa del modelo está compuesta por tres sub-componentes principales protegidos por conexiones residuales y normalización previa (\textit{Pre-LayerNorm}). El orden de estos sub-componentes fue objeto de una revisión arquitectónica durante el desarrollo.
