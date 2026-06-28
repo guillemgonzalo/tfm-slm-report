@@ -64,6 +64,14 @@ El HybridBlock introduce un tercer eje: el estado oculto $h_l \in \mathbb{R}^{d_
 
 Este flujo crea una \textbf{memoria vertical}: el modelo puede propagar información recurrente a través de su propia profundidad, no solo a través de la longitud de la secuencia. No se trata ni de recurrencia horizontal clásica (RNN sobre la secuencia) ni de propagación residual estándar (Transformer), sino de un mecanismo híbrido que las combina.
 
+\paragraph{Ciclo de vida de los estados ocultos GRU.}
+Los estados $h_l$ tienen un ciclo de vida bien definido que varía según el contexto de ejecución:
+
+\begin{itemize}
+    \item \textbf{Durante la generación (inferencia):} los estados se inicializan a cero antes de procesar el prompt (\textit{prefill}) y se acumulan token a token a lo largo de toda la secuencia generada. Cada nuevo token hereda el estado recurrente del token anterior, de modo que la memoria local capturada por el GRU crece con la longitud de la generación. Sin embargo, esta acumulación es local a cada llamada a \texttt{generate()}: entre turnos de conversación distintos, los estados se reinician a cero. El modelo no mantiene memoria recurrente entre mensajes de chat.
+    \item \textbf{Durante el entrenamiento:} cada batch se procesa de forma independiente, con \texttt{gru\_hidden\_states=None} en cada forward pass. No se implementa \textit{Truncated Backpropagation Through Time} (TBPTT) entre batches. Esta decisión simplifica el bucle de entrenamiento y elimina la necesidad de gestionar estados persistentes entre muestras, a costa de que el GRU aprenda únicamente patrones dentro de cada ventana de contexto de 1024 tokens.
+\end{itemize}
+
 \paragraph{Especialización por componente.}
 La consecuencia directa del orden GRU → MHA → MLP es una división de responsabilidades explícita dentro de cada bloque:
 
@@ -126,6 +134,12 @@ Escalado de Memoria & Cuadrático $O(L^2)$ & \textbf{Híbrido (Linear-assisted)}
 
 \subsection{Optimización y Estabilidad del Entrenamiento}
 Para garantizar que la arquitectura híbrida sea entrenable desde cero de forma estable, se han aplicado técnicas de inicialización y normalización avanzadas. Todos los pesos lineales se inicializan mediante una distribución normal con $\sigma = 0.02$, mientras que las capas de normalización comienzan con ganancia unidad y sesgo cero. El uso de \textit{causal masking} en cada bloque asegura que la parte de atención no rompa la naturaleza autorregresiva necesaria para la generación de lenguaje, demostrando la eficiencia de la arquitectura híbrida en entornos de recursos limitados.
+
+\paragraph{Inicialización de pesos GRU.}
+Los parámetros del GRU reciben un tratamiento específico: las matrices de entrada (\texttt{weight\_ih}) y recurrentes (\texttt{weight\_hh}) se inicializan con distribución ortogonal, mientras que los sesgos se establecen a cero. La inicialización ortogonal es estándar para componentes recurrentes pues preserva la norma del gradiente a través del tiempo, mitigando la explosión y desvanecimiento de gradiente durante el backpropagation.
+
+\paragraph{Gestión de estados GRU durante el entrenamiento.}
+Cada batch de entrenamiento se procesa de forma estadísticamente independiente: los estados ocultos GRU se inicializan a cero en cada forward pass (\texttt{gru\_hidden\_states=None}). No se implementa \textit{Truncated Backpropagation Through Time} (TBPTT) entre batches consecutivos. Esta decisión simplifica el bucle de entrenamiento y elimina la complejidad de propagar y truncar estados entre muestras no relacionadas, asumiendo que cada secuencia de 1024 tokens contiene contexto suficiente para que el GRU aprenda los patrones locales de interés.
 
 \subsection{Expectativas de Convergencia y Métricas de Éxito}
 Para validar la viabilidad del entrenamiento se han definido métricas de éxito basadas en la literatura de los SLM y los resultados preliminares observados. La confianza en la funcionalidad final del modelo se sustenta en tres pilares:

@@ -73,6 +73,32 @@ Coste hora empresa (32.500 EUR/año $\div$ 1.760 h/año) & 18,47 EUR/h \\ \hline
 \label{tab:coste_horas}
 \end{table}
 
+\subsubsection{Desglose por Fase del Proyecto}
+
+Las 264 horas se distribuyen entre las fases del proyecto de acuerdo con su complejidad y el esfuerzo real invertido:
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{|X|c|c|c|}
+\hline
+\textbf{Fase} & \textbf{Cap.} & \textbf{Horas} & \textbf{Coste (EUR)} \\ \hline
+Investigación bibliográfica y Estado del Arte & 2 & 30 & 554 \\ \hline
+Diseño de arquitectura híbrida Transformer-GRU & 5--6 & 28 & 517 \\ \hline
+Implementación del pipeline de datos y datasets & 4 & 22 & 406 \\ \hline
+Mejoras arquitectónicas e iteraciones de diseño & 6 & 25 & 462 \\ \hline
+Ciclos de entrenamiento$^{*}$ (configuración, despliegue, monitorización, análisis) & 5--7 & 20 & 369 \\ \hline
+Evaluación, benchmarking y análisis de resultados & 7 & 20 & 369 \\ \hline
+Infraestructura Cloud (AWS, Terraform, EC2, S3) & 8 & 30 & 554 \\ \hline
+MLOps (CI/CD, Docker, Kubernetes, ArgoCD) & 9 & 50 & 924 \\ \hline
+Redacción de la memoria TFM & --- & 39 & 721 \\ \hline
+\textbf{Total} & & \textbf{264} & \textbf{4.876} \\ \hline
+\end{tabularx}
+\caption{Desglose de horas \textit{humanas} por fase y coste equivalente a 18,47 EUR/h. $^{*}$El tiempo de cómputo autónomo de GPU ($\approx$98h en los tres ciclos) no se contabiliza como horas humanas --- ese coste ya figura en la Tabla~\ref{tab:costes_entreno}.}
+\label{tab:coste_fases}
+\end{table}
+
+Las dos fases de mayor carga humana son MLOps (50h: Docker, CI/CD, Kubernetes, ArgoCD y Terraform componen la fase más técnicamente extensa) y la redacción de la memoria (39h). Los ciclos de entrenamiento suman 20h humanas efectivas --- $\approx$7h por ciclo entre configuración, despliegue a EC2, revisión de logs y análisis de resultados --- mientras los $\approx$98h de cómputo autónomo de GPU corrieron de forma desatendida y se recogen exclusivamente en el coste de infraestructura.
+
 \begin{table}[H]
 \centering
 \begin{tabularx}{\textwidth}{|X|c|c|}
