@@ -99,6 +99,13 @@ Redacción de la memoria TFM & --- & 39 & 721 \\ \hline
 
 Las dos fases de mayor carga humana son MLOps (50h: Docker, CI/CD, Kubernetes, ArgoCD y Terraform componen la fase más técnicamente extensa) y la redacción de la memoria (39h). Los ciclos de entrenamiento suman 20h humanas efectivas --- $\approx$7h por ciclo entre configuración, despliegue a EC2, revisión de logs y análisis de resultados --- mientras los $\approx$98h de cómputo autónomo de GPU corrieron de forma desatendida y se recogen exclusivamente en el coste de infraestructura.
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.82\textwidth]{images/diagrams_costes/cost_human_pie.pdf}
+    \caption{Distribución del coste humano total (4.876 EUR) por fase del proyecto. MLOps representa la mayor inversión de tiempo (19\%), seguido de la redacción de la memoria (15\%). Las fases de investigación, diseño de arquitectura e infraestructura Cloud contribuyen cada una con un 11\%.}
+    \label{fig:cost_human_pie}
+\end{figure}
+
 \begin{table}[H]
 \centering
 \begin{tabularx}{\textwidth}{|X|c|c|}
