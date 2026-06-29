@@ -43,6 +43,98 @@ En el modelo propuesto se utilizan $h = 12$ cabezas sobre un espacio de $d_{mode
 \end{figure}
 
 % ---------------------------------------------------------------
+\subsection{Token Embeddings y Positional Encoding}
+
+Antes de entrar al primer bloque, cada token de la secuencia se convierte en un vector denso mediante una capa de embedding aprendible $E \in \mathbb{R}^{|V| \times d_{model}}$, donde $|V|$ es el tamaño del vocabulario. Para el token en posición $t$ con índice $w_t \in \{0, \ldots, |V|-1\}$:
+
+\begin{equation}
+    e_t = E[w_t] \in \mathbb{R}^{d_{model}}
+\end{equation}
+
+El modelo propuesto utiliza el vocabulario del tokenizador GPT-2 con $|V| = 50\,257$ y $d_{model} = 768$, resultando en una matriz de embedding de $50\,257 \times 768 = 38{,}6\text{M}$ parámetros. Para reducir el coste de memoria, los pesos de esta capa se comparten con la cabeza de predicción final (\textit{weight tying}): $W_{lm\_head} = E^\top$.
+
+El mecanismo de atención es invariante a la permutación: procesa el conjunto $\{e_1, \ldots, e_L\}$ sin noción de orden. Para dotar al modelo de información posicional, se añade un vector de codificación $p_t$ a cada embedding de entrada antes del primer bloque. La formulación sinusoidal original de Vaswani et al.~\cite{vaswani2017attention} define:
+
+\begin{equation}
+    PE_{(t,\,2i)} = \sin\!\left(\frac{t}{10000^{2i/d_{model}}}\right), \quad
+    PE_{(t,\,2i+1)} = \cos\!\left(\frac{t}{10000^{2i/d_{model}}}\right)
+\end{equation}
+
+donde $t$ es la posición del token y $2i$, $2i{+}1$ indexan las dimensiones del embedding por pares. Esta codificación es determinista y generaliza a longitudes no vistas durante el entrenamiento. El modelo propuesto utiliza embeddings posicionales \textit{aprendibles} (estilo GPT-2), donde $p_t$ es una fila de la matriz $P \in \mathbb{R}^{L_{max} \times d_{model}}$ optimizada junto con el resto de la red, ofreciendo mayor flexibilidad dentro del rango de contexto fijo $L \leq 1024$. La representación de entrada al primer bloque combina ambos vectores:
+
+\begin{equation}
+    x_t = e_t + p_t = E[w_t] + P[t]
+\end{equation}
+
+% ---------------------------------------------------------------
+\subsection{Feed-Forward Network}
+
+Cada bloque Transformer incluye, tras la capa de atención, una red de avance posición a posición (\textit{Feed-Forward Network}, FFN) aplicada de forma independiente a cada token:
+
+\begin{equation}
+    \text{FFN}(x) = \text{GELU}(x W_1 + b_1)\, W_2 + b_2
+\end{equation}
+
+donde $W_1 \in \mathbb{R}^{d_{model} \times d_{ff}}$ y $W_2 \in \mathbb{R}^{d_{ff} \times d_{model}}$. La dimensión interna $d_{ff} = 4 \cdot d_{model} = 3072$ actúa como espacio de proyección expandido donde el modelo puede representar combinaciones no lineales de las características extraídas por la atención. La función de activación GELU~\cite{hendrycks2016gelu} proporciona suavidad en el gradiente frente a ReLU, favoreciendo la convergencia en modelos de lenguaje. La FFN representa aproximadamente el 67\% del cómputo total por bloque.
+
+% ---------------------------------------------------------------
+\subsection{Layer Normalization y Conexiones Residuales}
+
+La \textit{Layer Normalization}~\cite{ba2016layer} normaliza cada vector de activación individualmente sobre sus $d_{model}$ dimensiones:
+
+\begin{equation}
+    \text{LayerNorm}(x) = \frac{x - \mu}{\sqrt{\sigma^2 + \varepsilon}} \cdot \gamma + \beta
+\end{equation}
+
+donde $\mu$ y $\sigma^2$ son la media y varianza del vector $x \in \mathbb{R}^{d_{model}}$, $\varepsilon$ es una constante de estabilidad numérica, y $\gamma, \beta \in \mathbb{R}^{d_{model}}$ son parámetros aprendibles de escala y desplazamiento. A diferencia de Batch Normalization, opera sobre la dimensión de características de un único ejemplo, lo que la hace independiente del tamaño de batch y adecuada para secuencias de longitud variable.
+
+El modelo propuesto adopta la variante \textbf{Pre-LayerNorm} (Pre-LN), donde la normalización se aplica antes de cada sublayer:
+
+\begin{equation}
+    x' = x + \text{Sublayer}(\text{LayerNorm}(x))
+\end{equation}
+
+frente al esquema Post-LN original de Vaswani et al., donde se aplica después. Pre-LN estabiliza el entrenamiento desde las primeras iteraciones al garantizar que los gradientes fluyen directamente a través de las conexiones residuales sin pasar por la normalización, reduciendo la sensibilidad al learning rate inicial.
+
+% ---------------------------------------------------------------
+\subsection{Causal Masking}
+
+En un modelo decoder-only, cada token $t$ solo puede atender a posiciones anteriores $\{1, \ldots, t\}$ para preservar la propiedad autoregresiva. Esto se implementa mediante una máscara triangular inferior $M \in \{0, -\infty\}^{L \times L}$ aplicada sobre las puntuaciones de atención antes del softmax:
+
+\begin{equation}
+    M_{ij} = \begin{cases} 0 & \text{si } j \leq i \\ -\infty & \text{si } j > i \end{cases}
+\end{equation}
+
+\begin{equation}
+    \text{Attention}(Q, K, V) = \text{softmax}\!\left(\frac{QK^\top + M}{\sqrt{d_k}}\right) V
+\end{equation}
+
+Los elementos con valor $-\infty$ colapsan a cero tras el softmax, anulando efectivamente la contribución de tokens futuros. Esta restricción convierte la MHA en \textit{MHA causal}, habilitando el entrenamiento por \textit{teacher forcing} con un único paso hacia adelante sobre toda la secuencia.
+
+% ---------------------------------------------------------------
+\subsection{Long Short-Term Memory (LSTM)}
+
+Las \textit{Long Short-Term Memory}~\cite{hochreiter1997lstm}, propuestas por Hochreiter y Schmidhuber en 1997, introducen un mecanismo de memoria explícita mediante una \textbf{celda de estado} $c_t$ separada del estado oculto $h_t$. Dado un token de entrada $x_t$ y los estados anteriores $h_{t-1}$, $c_t$, la LSTM computa:
+
+\begin{align}
+    f_t &= \sigma(W_f x_t + U_f h_{t-1} + b_f) & \text{(puerta de olvido)} \\
+    i_t &= \sigma(W_i x_t + U_i h_{t-1} + b_i) & \text{(puerta de entrada)} \\
+    o_t &= \sigma(W_o x_t + U_o h_{t-1} + b_o) & \text{(puerta de salida)} \\
+    \tilde{c}_t &= \tanh(W_c x_t + U_c h_{t-1} + b_c) & \text{(candidato de celda)} \\
+    c_t &= f_t \odot c_{t-1} + i_t \odot \tilde{c}_t & \text{(estado de celda)} \\
+    h_t &= o_t \odot \tanh(c_t) & \text{(estado oculto)}
+\end{align}
+
+donde $\sigma$ es la función sigmoide y $\odot$ el producto elemento a elemento. La \textbf{puerta de olvido} $f_t$ decide qué información descartar de la celda anterior; la \textbf{puerta de entrada} $i_t$ controla qué nuevo contenido escribir; la \textbf{puerta de salida} $o_t$ filtra qué parte del estado de celda se expone como $h_t$.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.72\textwidth]{images/fundamentos_teoricos/lstm_cell.png}
+    \caption{Estructura interna de una celda LSTM. La celda de estado $c_t$ (línea superior) actúa como memoria a largo plazo controlada por tres puertas: olvido $f_t$ (rojo), entrada $i_t$ (verde) y salida $o_t$ (azul). El estado oculto $h_t$ es una proyección filtrada de $c_t$.}
+    \label{fig:lstm_cell}
+\end{figure}
+
+% ---------------------------------------------------------------
 \subsection{Gated Recurrent Units (GRU)}
 
 Las \textit{Gated Recurrent Units}~\cite{cho2014learning} son una variante simplificada de las LSTM~\cite{hochreiter1997lstm} diseñada para reducir el número de puertas sin sacrificar capacidad de memoria selectiva. Dado un token de entrada $x_t$ y el estado oculto anterior $h_{t-1}$, el GRU computa:
@@ -56,16 +148,16 @@ Las \textit{Gated Recurrent Units}~\cite{cho2014learning} son una variante simpl
 
 donde $\sigma$ es la función sigmoide y $\odot$ denota el producto elemento a elemento. La \textbf{puerta de actualización} $z_t$ decide qué fracción del estado anterior se conserva; la \textbf{puerta de reinicio} $r_t$ controla cuánta información del pasado es relevante para computar el candidato $\tilde{h}_t$.
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.72\textwidth]{images/fundamentos_teoricos/gru_cell.png}
+    \caption{Estructura interna de una celda GRU. La puerta de reinicio $r_t$ (rojo) filtra cuánto del estado anterior $h_{t-1}$ se usa para calcular el candidato $\tilde{h}_t$ (verde). La puerta de actualización $z_t$ (morado) pondera la interpolación entre el estado anterior y el candidato para producir $h_t$.}
+    \label{fig:gru_cell}
+\end{figure}
+
 \subsubsection{Justificación de GRU frente a LSTM}
 
 La elección de GRU sobre LSTM está motivada por criterios de eficiencia en parámetros: una celda GRU tiene dos puertas frente a las tres de una LSTM (más la celda de memoria $c_t$), lo que reduce el número de parámetros por unidad en aproximadamente un 25\%. Estudios empíricos como los de Chung et al.~\cite{chung2014empirical} demuestran que esta reducción no implica pérdida significativa de rendimiento en tareas de modelado del lenguaje cuando el estado oculto tiene dimensión suficiente. En el contexto de un SLM con recursos limitados, esta eficiencia es determinante.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.40\textwidth]{images/diagrams_gru/gru_block.pdf}
-    \caption{Bloque GRU estándar: Pre-LayerNorm seguida de GRU con conexión residual. Captura patrones locales pero pierde contexto global a larga distancia; el estado oculto no persiste entre bloques.}
-    \label{fig:block_gru}
-\end{figure}
 
 % ---------------------------------------------------------------
 \subsection{La Hipótesis Híbrida: Análisis de Complejidad}
