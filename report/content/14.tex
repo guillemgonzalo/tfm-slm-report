@@ -1,0 +1,115 @@
+\section{Anexo: Configuración del Backend}
+\label{sec:anexo_setup_backend}
+
+Comandos para crear los recursos AWS necesarios \textbf{una sola vez} antes del primer despliegue: buckets S3 para código, checkpoints, datasets y estado de Terraform.
+
+% ---------------------------------------------------------------
+\subsection{Prerequisitos}
+
+\begin{lstlisting}[language=bash, caption={Verificación de credenciales AWS.}]
+# Verificar que tienes AWS CLI y credenciales configuradas
+aws sts get-caller-identity
+# Debe mostrar tu Account ID y User ARN
+\end{lstlisting}
+
+% ---------------------------------------------------------------
+\subsection{1. Crear Buckets S3}
+
+\subsubsection{1a. Bucket para Código (\texttt{tfm-slm-code})}
+\texttt{deploy.py} archiva y sube el código aquí. EC2 lo descarga al iniciar.
+
+\begin{lstlisting}[language=bash]
+aws s3api create-bucket \
+    --bucket tfm-slm-code \
+    --region eu-south-2 \
+    --create-bucket-configuration LocationConstraint=eu-south-2
+\end{lstlisting}
+
+\subsubsection{1b. Bucket para Checkpoints (\texttt{tfm-slm-checkpoints})}
+El entrenamiento guarda checkpoints aquí tras cada época. La inferencia los descarga si no están en local.
+
+\begin{lstlisting}[language=bash]
+aws s3api create-bucket \
+    --bucket tfm-slm-checkpoints \
+    --region eu-south-2 \
+    --create-bucket-configuration LocationConstraint=eu-south-2
+\end{lstlisting}
+
+\subsubsection{1c. Bucket para Datasets (\texttt{tfm-slm-datasets})}
+El dataset procesado (\texttt{.arrow}) se sube aquí tras el primer procesado. Runs posteriores lo restauran directamente, evitando reprocesar las 346.439 muestras.
+
+\begin{lstlisting}[language=bash]
+aws s3api create-bucket \
+    --bucket tfm-slm-datasets \
+    --region eu-south-2 \
+    --create-bucket-configuration LocationConstraint=eu-south-2
+\end{lstlisting}
+
+\subsubsection{1d. Bucket para Benchmarks (\texttt{tfm-slm-benchmarks})}
+Almacena resultados de benchmarking (métricas, perplejidad, throughput) en JSON.
+
+\begin{lstlisting}[language=bash]
+aws s3api create-bucket \
+    --bucket tfm-slm-benchmarks \
+    --region eu-south-2 \
+    --create-bucket-configuration LocationConstraint=eu-south-2
+\end{lstlisting}
+
+\subsubsection{1e. Bucket para Estado Terraform (\texttt{tfm-slm-terraform-state})}
+Almacena \texttt{terraform.tfstate} de forma centralizada, permitiendo múltiples ejecuciones seguras.
+
+\begin{lstlisting}[language=bash]
+aws s3api create-bucket \
+    --bucket tfm-slm-terraform-state \
+    --region eu-south-2 \
+    --create-bucket-configuration LocationConstraint=eu-south-2
+\end{lstlisting}
+
+% ---------------------------------------------------------------
+\subsection{2. Habilitar Versionado}
+
+Habilita versionado en el bucket de estado para recuperar versiones anteriores si algo falla.
+
+\begin{lstlisting}[language=bash, caption={Versionado en bucket de estado Terraform.}]
+aws s3api put-bucket-versioning \
+    --bucket tfm-slm-terraform-state \
+    --versioning-configuration Status=Enabled
+\end{lstlisting}
+
+% ---------------------------------------------------------------
+\subsection{3. Validar Buckets Creados}
+
+\begin{lstlisting}[language=bash, caption={Validación de los buckets creados en eu-south-2.}]
+# Listar todos los buckets
+aws s3 ls
+
+# Verificar que todos los buckets estan en eu-south-2
+aws s3api list-buckets --query 'Buckets[?contains(Name, `tfm-slm`)]'
+
+# Verificar versionado habilitado en terraform-state
+aws s3api get-bucket-versioning --bucket tfm-slm-terraform-state
+\end{lstlisting}
+
+% ---------------------------------------------------------------
+\subsection{4. Flujo Completo tras el Setup}
+
+\begin{lstlisting}[language=bash, caption={Flujo completo de despliegue tras la configuración inicial.}]
+# 1. Preparar codigo y subirlo a S3 (1=train, 2=inference, 3=benchmark)
+echo "1" | python3 deploy.py
+
+# 2. Provisionar EC2 (descarga codigo, construye Docker con GPU)
+cd app/terraform
+terraform init       # Solo la primera vez
+terraform apply -auto-approve -lock=false
+
+# 3. Monitorizar build y entrenamiento
+ssh -i "tfm-slm.pem" ec2-user@<IP> tail -f /var/log/user-data.log
+\end{lstlisting}
+
+\subsection*{Notas}
+\begin{itemize}
+    \item \textbf{S3 Native Locking}: Terraform usa \texttt{use\_lockfile = true} (no requiere DynamoDB).
+    \item \textbf{Credenciales AWS}: Se leen automáticamente desde \texttt{\textasciitilde/.aws/credentials}.
+    \item \textbf{Región}: Todos los buckets en \texttt{eu-south-2}.
+    \item \textbf{Nombres únicos}: Los nombres de buckets S3 son globales en AWS. Si ya existen, usar nombres distintos en \texttt{deploy.py} y \texttt{terraform.tfvars}.
+\end{itemize}
