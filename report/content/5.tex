@@ -5,12 +5,14 @@ Este capítulo detalla la aportación técnica central de este TFM: la integraci
 
 \subsection{Arquitectura del Modelo: Hybrid Transformer-GRU}
 
-El modelo \texttt{tfm-slm} sigue el paradigma \textbf{decoder-only} con atención causal: no existe encoder ni cross-attention, y cada token solo puede atender a posiciones anteriores. Cada uno de los 12 bloques del modelo fusiona un componente recurrente (GRU) y uno atencional (MHA) dentro del mismo bloque decoder. El proceso iterativo de desarrollo que llevó a este diseño, incluyendo las limitaciones del diseño inicial y las mejoras aplicadas, se documenta en el Capítulo~\ref{sec:implementation}.
+El modelo \texttt{tfm-slm} sigue el paradigma \textbf{decoder-only} con atención causal: no existe encoder ni cross-attention, y cada token solo puede atender a posiciones anteriores. Cada uno de los 12 bloques del modelo fusiona un componente recurrente (GRU) y uno atencional (MHA) dentro del mismo bloque decoder.
+
+La propuesta inicial ordenaba los sub-componentes como MHA $\to$ GRU $\to$ MLP (Figura~\ref{fig:block_inicial}): la atención capturaba primero el contexto global y el GRU refinaba secuencialmente su salida. Este diseño presentó problemas de redundancia entre componentes y pérdida del estado recurrente entre bloques. El proceso iterativo de desarrollo que identificó estas limitaciones y las resolvió se documenta en detalle en el Capítulo~\ref{sec:implementation}, donde se presenta también el diseño final resultante.
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.45\textwidth]{images/diagrams_hybridblock/block_inicial.pdf}
-    \caption{Diseño inicial del bloque híbrido (MHA $\to$ GRU $\to$ MLP). El GRU recibe una representación ya transformada por la atención, generando redundancia entre ambos componentes. El estado oculto del GRU se descartaba al final de cada bloque.}
+    \caption{Diseño inicial del bloque híbrido (MHA $\to$ GRU $\to$ MLP). El GRU recibe una representación ya transformada por la atención, generando redundancia entre ambos componentes. El estado oculto del GRU se descartaba al final de cada bloque, eliminando cualquier memoria recurrente vertical.}
     \label{fig:block_inicial}
 \end{figure}
 
