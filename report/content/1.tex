@@ -69,10 +69,10 @@ El objetivo principal es diseñar, implementar y validar esta arquitectura híbr
 
 \begin{itemize}
     \item \textbf{Capítulo 2}: Estado del arte --- evolución de LLM a SLM, RNN, LSTM, GRU, Transformers y arquitecturas híbridas modernas
-    \item \textbf{Capítulo 3}: Fundamentos teóricos --- formalización matemática del mecanismo de atención, MHA, GRU y análisis de complejidad híbrida
-    \item \textbf{Capítulo 4}: Datos y datasets --- descripción de los conjuntos de datos utilizados para el entrenamiento
-    \item \textbf{Capítulo 5}: Mejoras arquitectónicas e implementación --- proceso iterativo de desarrollo y decisiones de ingeniería
-    \item \textbf{Capítulo 6}: Diseño e implementación de la arquitectura híbrida --- estrategia de mezcla de datos, especificación técnica del modelo y configuración del entrenamiento
+    \item \textbf{Capítulo 3}: Fundamentos teóricos --- formalización matemática de token embeddings, positional encoding, self-attention, MHA, FFN, layer normalization, causal masking, LSTM, GRU y análisis de complejidad de la hipótesis híbrida
+    \item \textbf{Capítulo 4}: Datos y datasets --- pipeline de descarga, armonización y serialización Apache Arrow; estadísticas finales del dataset de entrenamiento
+    \item \textbf{Capítulo 5}: Diseño e implementación de la arquitectura híbrida --- visión general del modelo decoder-only, especificaciones técnicas y comparativa con SmolLM2-135M
+    \item \textbf{Capítulo 6}: Mejoras arquitectónicas e implementación --- proceso iterativo de desarrollo: limitaciones del diseño inicial, 9 mejoras aplicadas (estados GRU persistentes, reorden de componentes, inicialización ortogonal, gradient clipping, Flash Attention, etc.) y diseño final del HybridBlock
     \item \textbf{Capítulo 7}: Evaluación y benchmarking --- 10 métricas de calidad, eficiencia y recursos sobre 300.000 muestras
     \item \textbf{Capítulo 8}: Infraestructura cloud --- ecosistema AWS, hardware G6/G6e/G7e, Terraform, optimización de VRAM y progresión de hardware
     \item \textbf{Capítulo 9}: MLOps: despliegue y puesta en producción --- CI/CD, reproducibilidad, Rulesets, testing automatizado, Terraform e infraestructura GitOps con Kubernetes y ArgoCD
