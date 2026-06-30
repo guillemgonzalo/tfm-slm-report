@@ -4,19 +4,8 @@
 Este capítulo detalla la aportación técnica central de este TFM: la integración de Transformers y GRU en un único modelo funcional, así como la estrategia de curación de datos y la configuración del entrenamiento desde cero, con comparativa técnica frente al estado del arte.
 
 \subsection{Arquitectura del Modelo: Hybrid Transformer-GRU}
-El modelo \texttt{tfm-slm} sigue el paradigma \textbf{decoder-only} con atención causal: no existe encoder ni cross-attention, y cada token solo puede atender a posiciones anteriores. Este diseño, adoptado por la familia GPT y LLaMA, es el estándar para generación autorregresiva de lenguaje. La innovación técnica central radica en su arquitectura de bloques híbridos integrados: a diferencia de enfoques que simplemente concatenan capas, cada uno de los 12 bloques fusiona capacidades globales y secuenciales dentro del mismo bloque decoder.
 
-\subsubsection{El Bloque Híbrido (HybridBlock)}
-Cada capa del modelo está compuesta por tres sub-componentes principales protegidos por conexiones residuales y normalización previa (\textit{Pre-LayerNorm}). El orden de estos sub-componentes fue objeto de una revisión arquitectónica durante el desarrollo.
-
-\paragraph{Diseño inicial (MHA → GRU → MLP).}
-La propuesta original situaba la Multi-Head Attention en primer lugar, seguida del GRU y finalmente el MLP:
-\begin{enumerate}
-    \item \textbf{Multi-Head Attention (MHA):} captura dependencias globales sobre la entrada bruta.
-    \item \textbf{Gated Recurrent Unit (GRU):} refina secuencialmente la salida de la atención.
-    \item \textbf{Feed-Forward Network (MLP):} proyección no-lineal final.
-\end{enumerate}
-Este orden presentaba un problema de redundancia: la MHA transformaba radicalmente la representación antes de que el GRU la recibiera, dejando poco margen para que el componente recurrente capturara patrones locales diferenciados. El análisis detallado de esta decisión arquitectónica se desarrolla en el Capítulo~\ref{sec:implementation}.
+El modelo \texttt{tfm-slm} sigue el paradigma \textbf{decoder-only} con atención causal: no existe encoder ni cross-attention, y cada token solo puede atender a posiciones anteriores. Cada uno de los 12 bloques del modelo fusiona un componente recurrente (GRU) y uno atencional (MHA) dentro del mismo bloque decoder. El proceso iterativo de desarrollo que llevó a este diseño, incluyendo las limitaciones del diseño inicial y las mejoras aplicadas, se documenta en el Capítulo~\ref{sec:implementation}.
 
 \begin{figure}[H]
     \centering
@@ -24,15 +13,6 @@ Este orden presentaba un problema de redundancia: la MHA transformaba radicalmen
     \caption{Diseño inicial del bloque híbrido (MHA $\to$ GRU $\to$ MLP). El GRU recibe una representación ya transformada por la atención, generando redundancia entre ambos componentes. El estado oculto del GRU se descartaba al final de cada bloque.}
     \label{fig:block_inicial}
 \end{figure}
-
-\paragraph{Diseño final (GRU → MHA → MLP).}
-Tras el análisis documentado en el Capítulo~\ref{sec:implementation} (Mejora 2), se invirtió el orden de los dos primeros sub-componentes. Esta es la arquitectura implementada en el código final (\texttt{app/model/architecture.py}):
-\begin{enumerate}
-    \item \textbf{Gated Recurrent Unit (GRU):} procesa la entrada en primer lugar, capturando patrones secuenciales locales y estructura sintáctica. Opera sobre el estado oculto persistente del bloque anterior, entregando a la atención una representación ya refinada localmente.
-    \item \textbf{Multi-Head Attention (MHA):} recibe la salida del GRU y captura dependencias globales a larga distancia. Configurada con 12 cabezas para un \textit{hidden size} de 768.
-    \item \textbf{Feed-Forward Network (MLP):} red de dos capas lineales con activación GELU y factor de expansión 4 ($3072$ neuronas).
-\end{enumerate}
-Este reorden establece un flujo de procesamiento de lo local a lo global: el GRU captura primero estructura sintáctica local y el MHA resuelve dependencias globales sobre una representación ya parcialmente refinada, eliminando la redundancia del diseño inicial.
 
 \begin{figure}[H]
     \centering
@@ -44,7 +24,7 @@ Este reorden establece un flujo de procesamiento de lo local a lo global: el GRU
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.55\textwidth]{images/diagrams_hybridblock/hybridblock.pdf}
-    \caption{HybridBlock: integración de GRU (Figura~\ref{fig:block_gru}) y MHA (Figura~\ref{fig:block_transformer}) en un único bloque. Cada sub-componente aplica Pre-LayerNorm y conexión residual. El estado oculto del GRU ($h_l \rightarrow h_{l+1}$) persiste entre bloques consecutivos, dotando al modelo de memoria vertical a lo largo de la profundidad de la red.}
+    \caption{HybridBlock: integración de GRU y MHA en un único bloque. Cada sub-componente aplica Pre-LayerNorm y conexión residual. El estado oculto del GRU ($h_l \rightarrow h_{l+1}$) persiste entre bloques consecutivos, dotando al modelo de memoria vertical a lo largo de la profundidad de la red.}
     \label{fig:hybridblock}
 \end{figure}
 
@@ -54,48 +34,6 @@ Este reorden establece un flujo de procesamiento de lo local a lo global: el GRU
     \caption{Arquitectura completa del tfm-slm: 12 HybridBlocks apilados con flujo de activaciones (flechas negras) y canal de estados ocultos GRU (flechas azules). Cada bloque $l$ genera un estado $h_l$ que se propaga como entrada recurrente al bloque $l+1$, creando memoria vertical a través de la profundidad de la red. La capa de embeddings y el LM Head comparten pesos (\textit{weight tying}).}
     \label{fig:model_stack}
 \end{figure}
-
-\subsubsection{Análisis del Flujo de Información en el HybridBlock}
-
-\paragraph{Memoria vertical: el eje recurrente entre bloques.}
-En un Transformer estándar la información fluye en dos ejes: \textit{horizontalmente} a través de los tokens de la secuencia (dentro de cada bloque, vía atención) y \textit{verticalmente} de capa a capa mediante conexiones residuales. Sin embargo, cada bloque procesa su entrada de forma independiente del estado interno de los bloques adyacentes.
-
-El HybridBlock introduce un tercer eje: el estado oculto $h_l \in \mathbb{R}^{d_{model}}$ del GRU del bloque $l$ se propaga como entrada al GRU del bloque $l+1$. Esto significa que el bloque 2 no solo recibe la salida residual del bloque 1 (que ya hacía el Transformer), sino también el \textit{resumen recurrente} de los patrones locales que el bloque 1 extrajo de la secuencia. El bloque 3 hereda a su vez el estado acumulado de los bloques 1 y 2, y así sucesivamente hasta el bloque 12.
-
-Este flujo crea una \textbf{memoria vertical}: el modelo puede propagar información recurrente a través de su propia profundidad, no solo a través de la longitud de la secuencia. No se trata ni de recurrencia horizontal clásica (RNN sobre la secuencia) ni de propagación residual estándar (Transformer), sino de un mecanismo híbrido que las combina.
-
-\paragraph{Ciclo de vida de los estados ocultos GRU.}
-Los estados $h_l$ tienen un ciclo de vida bien definido que varía según el contexto de ejecución:
-
-\begin{itemize}
-    \item \textbf{Durante la generación (inferencia):} los estados se inicializan a cero antes de procesar el prompt (\textit{prefill}) y se acumulan token a token a lo largo de toda la secuencia generada. Cada nuevo token hereda el estado recurrente del token anterior, de modo que la memoria local capturada por el GRU crece con la longitud de la generación. Sin embargo, esta acumulación es local a cada llamada a \texttt{generate()}: entre turnos de conversación distintos, los estados se reinician a cero. El modelo no mantiene memoria recurrente entre mensajes de chat.
-    \item \textbf{Durante el entrenamiento:} cada batch se procesa de forma independiente, con \texttt{gru\_hidden\_states=None} en cada forward pass. No se implementa \textit{Truncated Backpropagation Through Time} (TBPTT) entre batches. Esta decisión simplifica el bucle de entrenamiento y elimina la necesidad de gestionar estados persistentes entre muestras, a costa de que el GRU aprenda únicamente patrones dentro de cada ventana de contexto de 1024 tokens.
-\end{itemize}
-
-\paragraph{Especialización por componente.}
-La consecuencia directa del orden GRU → MHA → MLP es una división de responsabilidades explícita dentro de cada bloque:
-
-\begin{itemize}
-    \item \textbf{GRU}: recibe la representación del token en el contexto del estado recurrente heredado del bloque anterior. Captura patrones \textit{locales}: orden de palabras, concordancia morfológica, estructura sintáctica inmediata. Entrega a la MHA una representación ya parcialmente refinada a escala local.
-    \item \textbf{MHA}: opera sobre la salida del GRU e integra dependencias \textit{globales} a larga distancia (co-referencias pronominales, relaciones semánticas entre tokens alejados). Al recibir una representación ya estructurada localmente, la atención puede dedicar su capacidad a resolver relaciones de largo alcance sin necesidad de también modelar la sintaxis inmediata.
-    \item \textbf{MLP}: aplica una proyección no-lineal sobre la representación integrada, con factor de expansión 4 ($768 \rightarrow 3072 \rightarrow 768$). Actúa como banco de memoria factual~\cite{geva2021transformer}, transformando la representación combinada en un vector listo para el siguiente bloque.
-\end{itemize}
-
-\paragraph{Comparativa con arquitecturas híbridas del estado del arte.}
-La arquitectura propuesta comparte principios con Jamba~\cite{lieber2024jamba} (hibridación de atención y SSM en bloques \textit{alternos}) y Mamba~\cite{gu2023mamba} (State Space Models como alternativa lineal). La diferencia clave es que el HybridBlock \textit{integra} GRU y MHA dentro de cada bloque en lugar de alternarlos. Esto implica mayor coste computacional por bloque, pero también mayor densidad de representación: cada bloque procesa la misma entrada desde dos perspectivas complementarias (local recurrente y global atencional) antes de proyectarla. Con 12 bloques frente a los 30 de SmolLM2-135M, el HybridBlock compensa la menor profundidad con mayor riqueza por capa.
-
-\subsubsection{Optimización del Cómputo de Atención: Flash Attention}
-El mecanismo de Multi-Head Attention estándar materializa la matriz $QK^\top \in \mathbb{R}^{L \times L}$ en memoria VRAM, lo que implica un coste de $O(L^2)$ en lecturas y escrituras HBM (\textit{High Bandwidth Memory}). Para secuencias de longitud $L = 1024$ con 12 cabezas y \textit{hidden size} 768, este coste de acceso a memoria domina el tiempo de cómputo real.
-
-Para eliminar este cuello de botella, el modelo utiliza \textbf{Flash Attention v2.8.3}~\cite{dao2022flashattention}, implementada por el repositorio \texttt{dao-ailab/flash-attention}. Flash Attention reescribe el algoritmo de atención mediante tiling de bloques en SRAM, evitando materializar la matriz de atención completa en HBM. El resultado es matemáticamente idéntico al de la atención estándar pero con complejidad de acceso a memoria $O(L)$ en lugar de $O(L^2)$.
-
-En la práctica, su integración en el entrenamiento del tfm-slm aporta dos beneficios concretos:
-\begin{enumerate}
-    \item \textbf{Reducción de VRAM:} al no almacenar la matriz de atención completa, el pico de memoria GPU durante el forward pass disminuye significativamente, lo que permitió aumentar el batch físico de 4 a 16 sin superar los 24 GB de la NVIDIA L4.
-    \item \textbf{Aceleración del entrenamiento:} la reducción de transferencias HBM se traduce en un incremento de throughput de aproximadamente 2--4$\times$ respecto a la implementación estándar de PyTorch en hardware con arquitectura Ada Lovelace.
-\end{enumerate}
-
-Flash Attention se compila durante la construcción de la imagen Docker, dado que requiere extensiones CUDA específicas para la GPU objetivo. Esta compilación está incluida en el \texttt{Dockerfile} del proyecto y se ejecuta automáticamente en la instancia EC2 como parte del pipeline de despliegue descrito en el Capítulo~\ref{sec:mlops}.
 
 \subsubsection{Especificaciones Técnicas y Parámetros}
 El modelo se ha dimensionado para ser competitivo en el rango de los Small Language Models, optimizando el ancho de banda de la arquitectura para hardware de 24 GB de VRAM. A continuación se detallan las especificaciones y una comparativa directa con el modelo de referencia en la industria, SmolLM2-135M.
@@ -132,22 +70,3 @@ Escalado de Memoria & Cuadrático $O(L^2)$ & \textbf{Híbrido (Linear-assisted)}
     \item \textbf{Weight Tying:} Se ha implementado el amarre de pesos entre la capa de \textit{embeddings} y la cabeza de salida (\textit{LM Head}), reduciendo el uso de memoria en un 18\%.
 \end{itemize}
 
-\subsection{Optimización y Estabilidad del Entrenamiento}
-Para garantizar que la arquitectura híbrida sea entrenable desde cero de forma estable, se han aplicado técnicas de inicialización y normalización avanzadas. Todos los pesos lineales se inicializan mediante una distribución normal con $\sigma = 0.02$, mientras que las capas de normalización comienzan con ganancia unidad y sesgo cero. El uso de \textit{causal masking} en cada bloque asegura que la parte de atención no rompa la naturaleza autorregresiva necesaria para la generación de lenguaje, demostrando la eficiencia de la arquitectura híbrida en entornos de recursos limitados.
-
-\paragraph{Inicialización de pesos GRU.}
-Los parámetros del GRU reciben un tratamiento específico: las matrices de entrada (\texttt{weight\_ih}) y recurrentes (\texttt{weight\_hh}) se inicializan con distribución ortogonal, mientras que los sesgos se establecen a cero. La inicialización ortogonal es estándar para componentes recurrentes pues preserva la norma del gradiente a través del tiempo, mitigando la explosión y desvanecimiento de gradiente durante el backpropagation.
-
-\paragraph{Gestión de estados GRU durante el entrenamiento.}
-Cada batch de entrenamiento se procesa de forma estadísticamente independiente: los estados ocultos GRU se inicializan a cero en cada forward pass (\texttt{gru\_hidden\_states=None}). No se implementa \textit{Truncated Backpropagation Through Time} (TBPTT) entre batches consecutivos. Esta decisión simplifica el bucle de entrenamiento y elimina la complejidad de propagar y truncar estados entre muestras no relacionadas, asumiendo que cada secuencia de 1024 tokens contiene contexto suficiente para que el GRU aprenda los patrones locales de interés.
-
-\subsection{Expectativas de Convergencia y Métricas de Éxito}
-Para validar la viabilidad del entrenamiento se han definido métricas de éxito basadas en la literatura de los SLM y los resultados preliminares observados. La confianza en la funcionalidad final del modelo se sustenta en tres pilares:
-
-\begin{enumerate}
-    \item \textbf{Calidad del Curado de Datos (Data Mix):} A diferencia del entrenamiento masivo con datos web no filtrados, el uso de datasets de \textit{instruction-tuning} como Alpaca y ShareGPT garantiza que el modelo aprenda a seguir instrucciones desde las fases iniciales. La inclusión de OpenAssistant aporta la naturalidad conversacional necesaria para un agente funcional.
-    \item \textbf{Leyes de Escala (Scaling Laws):} Con ~167M de parámetros, el modelo se sitúa en un rango superior al GPT-2 Small (124M), el cual ya demostró capacidades emergentes de razonamiento gramatical. Los 43M de parámetros adicionales dedicados al componente GRU actúan como una reserva de memoria dedicada a la consistencia secuencial.
-    \item \textbf{Convergencia Observada:} El descenso de la función de pérdida (\textit{loss}) hasta un valor de 1.72 en la primera época es un indicador sólido de estabilidad. Se estimó que una programación de 15 épocas permitiría transicionar desde el aprendizaje de estructuras gramaticales básicas (Épocas 1--3) hacia la asociación de conceptos semánticos y el refinamiento del estilo de respuesta (Épocas finales).
-\end{enumerate}
-
-Se definió como éxito un modelo que demostrase coherencia sintáctica, adherencia al formato de diálogo \textit{User/Assistant} y capacidad de recuperación de información básica. Los resultados cuantitativos del benchmark (PPL=2,98, Top-1=79,75\%) satisfacen las métricas de predicción, pero la evaluación cualitativa posterior reveló que estas expectativas no se cumplen en generación libre: el déficit de tokens respecto al óptimo de Chinchilla impide el desarrollo de capacidades generativas emergentes. El análisis completo se recoge en el Capítulo~\ref{sec:conclusiones}.
