@@ -73,7 +73,7 @@ h_t &= o_t \odot \tanh(C_t)
     \centering
     \includegraphics[width=0.62\textwidth]{images/diagrams_estado_arte/lstm_cell.pdf}
     \caption{Celda LSTM con sus tres compuertas: forget gate (decide qué olvidar del cell state anterior), input gate (decide qué nueva información escribir) y output gate (decide qué parte del cell state exponer como $h_t$). Las conexiones aditivas en $C_t$ permiten flujo de gradiente sin atenuación.}
-    \label{fig:lstm_cell}
+    \label{fig:lstm_cell_sota}
 \end{figure}
 
 Las compuertas utilizan funciones sigmoides que producen valores en $[0,1]$, permitiendo multiplicación suave sin saturación. La célula de memoria $C_t$ mantiene una conexión directa con gradientes a través de suma, evitando desvanecimiento.
@@ -91,7 +91,7 @@ h_t &= (1 - z_t) \odot h_{t-1} + z_t \odot \tilde{h}_t
     \centering
     \includegraphics[width=0.62\textwidth]{images/diagrams_estado_arte/gru_cell.pdf}
     \caption{Celda GRU. A diferencia de la LSTM, unifica las compuertas de olvido e input en una única \textit{update gate} ($z_t$) y añade una \textit{reset gate} ($r_t$) que controla cuánto del estado anterior $h_{t-1}$ fluye hacia el candidato. La salida $h_t = (1-z_t)\odot h_{t-1} + z_t \odot \tilde{h}_t$ mezcla directamente estado anterior y candidato sin estado de celda separado.}
-    \label{fig:gru_cell}
+    \label{fig:gru_cell_sota}
 \end{figure}
 
 Las GRUs logran un rendimiento comparable a LSTMs con \textbf{menos parámetros} ($\sim$33\% menos) y son más fáciles de entrenar. Ambas arquitecturas eliminan el problema de vanishing gradients al mantener conexiones aditivas directas en la ruta del gradiente, pero siguen siendo secuenciales: el tiempo de inferencia crece linealmente con la longitud de la secuencia.
