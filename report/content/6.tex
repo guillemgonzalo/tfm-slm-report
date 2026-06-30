@@ -119,17 +119,16 @@ Se espera que durante el entrenamiento correcto, tanto training loss como valida
 
 \subsection{Mejora 7: Herramienta de Análisis Arquitectónico}
 
-Se creó la clase \texttt{HybridArchitectureAnalyzer} que proporciona capacidades de diagnóstico detalladas más allá del logging básico. Esta herramienta permite:
+Se implementó la clase \texttt{HybridArchitectureAnalyzer} (\texttt{app/utils/analyzer.py}) que centraliza el diagnóstico del entrenamiento en cuatro funciones concretas:
 
 \begin{itemize}
-    \item Análisis completo de contribuciones de componentes
-    \item Exportación de métricas a JSON para análisis posterior con herramientas externas
-    \item Generación de reportes legibles por humanos
-    \item Análisis del flujo de hidden states a través de capas
-    \item Comparación de arquitecturas alternativas
+    \item \textbf{Contribuciones por componente} (\texttt{analyze\_component\_contributions}): calcula la norma L2 de los gradientes de GRU, MHA y MLP sumando sobre los 12 bloques tras cada backward pass. Produce el ratio GRU/Attn con diagnóstico automático: \texttt{WELL BALANCED} (0.5–1.5), \texttt{GRU too weak} ($<$0.3) o \texttt{GRU dominating} ($>$1.5).
+    \item \textbf{Flujo de estados ocultos} (\texttt{analyze\_hidden\_state\_flow}): mide la norma de $h_l$ en cada una de las 12 capas durante inferencia, retornando min/max/media. Permite detectar colapso o saturación del estado recurrente a lo largo de la profundidad.
+    \item \textbf{Historial de métricas} (\texttt{log\_metrics} + \texttt{save\_metrics}): acumula por step el loss, val\_loss y grad\_norm antes/después del clipping, exportándolo a JSON al final de cada época para análisis externo.
+    \item \textbf{Resumen de entrenamiento} (\texttt{print\_summary}): genera un log estructurado con loss final/mínimo/medio, val\_loss y el rango del ratio GRU/Attn para toda la época.
 \end{itemize}
 
-El analyzer puede ser invocado durante o después del entrenamiento, permitiendo tanto monitoreo en vivo como análisis post-hoc de los datos de entrenamiento.
+El analyzer se instancia en el trainer y se invoca cada \texttt{log\_metrics\_every} pasos (por defecto 100). Los archivos JSON se guardan en la instancia EC2 durante el entrenamiento; no persisten en el repositorio.
 
 \subsection{Mejora 8: Suite de Tests Automatizados}
 
