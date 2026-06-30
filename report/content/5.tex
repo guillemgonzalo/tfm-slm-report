@@ -14,27 +14,6 @@ El modelo \texttt{tfm-slm} sigue el paradigma \textbf{decoder-only} con atenció
     \label{fig:block_inicial}
 \end{figure}
 
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.45\textwidth]{images/diagrams_hybridblock/block_final.pdf}
-    \caption{Diseño final del bloque híbrido (GRU $\to$ MHA $\to$ MLP). El GRU procesa la entrada bruta y propaga su estado oculto al bloque siguiente ($h_l \to h_{l+1}$), dotando al modelo de memoria vertical a través de la profundidad de la red.}
-    \label{fig:block_final}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.55\textwidth]{images/diagrams_hybridblock/hybridblock.pdf}
-    \caption{HybridBlock: integración de GRU y MHA en un único bloque. Cada sub-componente aplica Pre-LayerNorm y conexión residual. El estado oculto del GRU ($h_l \rightarrow h_{l+1}$) persiste entre bloques consecutivos, dotando al modelo de memoria vertical a lo largo de la profundidad de la red.}
-    \label{fig:hybridblock}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.58\textwidth]{images/diagrams_hybridblock/model_stack.pdf}
-    \caption{Arquitectura completa del tfm-slm: 12 HybridBlocks apilados con flujo de activaciones (flechas negras) y canal de estados ocultos GRU (flechas azules). Cada bloque $l$ genera un estado $h_l$ que se propaga como entrada recurrente al bloque $l+1$, creando memoria vertical a través de la profundidad de la red. La capa de embeddings y el LM Head comparten pesos (\textit{weight tying}).}
-    \label{fig:model_stack}
-\end{figure}
-
 \subsubsection{Especificaciones Técnicas y Parámetros}
 El modelo se ha dimensionado para ser competitivo en el rango de los Small Language Models, optimizando el ancho de banda de la arquitectura para hardware de 24 GB de VRAM. A continuación se detallan las especificaciones y una comparativa directa con el modelo de referencia en la industria, SmolLM2-135M.
 
