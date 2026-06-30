@@ -11,7 +11,7 @@
 \tikzset{
   hblock/.style={
     rectangle, rounded corners=5pt,
-    minimum width=5.5cm, minimum height=1.0cm,
+    minimum width=5.5cm, minimum height=1.4cm,
     draw=gray!40, thick, fill=blockbg
   },
   ioblock/.style={
@@ -24,20 +24,20 @@
   garr/.style={-{Stealth[length=4.5pt]}, thick, color=grucolor!80}
 }
 
-% block height = 1.0cm, node distance = 0.8cm
-% center-to-center vertical distance = 0.5 + 0.8 + 0.5 = 1.8cm
+% block height = 1.4cm, node distance = 0.8cm
+% center-to-center vertical distance = 0.7 + 0.8 + 0.7 = 2.2cm
 
 \newcommand{\blockinnards}[1]{%
   \node[font=\scriptsize\bfseries, text=grucolor!80!black]
-    at ([xshift=-1.6cm]#1.center) {GRU};
+    at ([xshift=-1.6cm, yshift=-5pt]#1.center) {GRU};
   \node[font=\scriptsize, text=gray!40]
-    at ([xshift=-0.65cm]#1.center) {|};
+    at ([xshift=-0.65cm, yshift=-5pt]#1.center) {|};
   \node[font=\scriptsize\bfseries, text=mhacolor!80!black]
-    at (#1.center) {MHA};
+    at ([yshift=-5pt]#1.center) {MHA};
   \node[font=\scriptsize, text=gray!40]
-    at ([xshift=0.65cm]#1.center) {|};
+    at ([xshift=0.65cm, yshift=-5pt]#1.center) {|};
   \node[font=\scriptsize\bfseries, text=mlpcolor!80!black]
-    at ([xshift=1.6cm]#1.center) {MLP};
+    at ([xshift=1.6cm, yshift=-5pt]#1.center) {MLP};
 }
 
 \begin{document}
@@ -98,12 +98,12 @@
 
   % h_1: Block 1 → Block 2
   \draw[garr]
-    (b1.east) -- ++(1.1,0) -- ++(0,-1.8) -- (b2.east)
+    (b1.east) -- ++(1.1,0) -- ++(0,-2.2) -- (b2.east)
     node[pos=0.5, right, font=\scriptsize\bfseries, text=grucolor] {$h_1$};
 
   % h_2: Block 2 → Block 3
   \draw[garr]
-    (b2.east) -- ++(1.1,0) -- ++(0,-1.8) -- (b3.east)
+    (b2.east) -- ++(1.1,0) -- ++(0,-2.2) -- (b3.east)
     node[pos=0.5, right, font=\scriptsize\bfseries, text=grucolor] {$h_2$};
 
   % h_3 stub going into dots
