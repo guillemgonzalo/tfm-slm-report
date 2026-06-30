@@ -196,9 +196,9 @@ tokenized_ds.save_to_disk(".datasets/mixed_dataset")
 \begin{enumerate}
     \item \textbf{Memory Mapping (Zero-Copy Reading)}: Los archivos .arrow se mapean directamente a la memoria RAM sin copiar datos. Esto permite entrenar con datasets de decenas de gigabytes usando máquinas con VRAM limitada (16 GB). El kernel del SO maneja el paging automático, trayendo datos del disco bajo demanda.
 
-    \item \textbf{Almacenamiento Columnar}: A diferencia de JSON (por fila) o Parquet (variabilidad), Arrow almacena por columnas. Para datasets de NLP donde cada ejemplo tiene un único campo \texttt{text}, esto optimiza compresión y velocidad de lectura secuencial.
+    \item \textbf{Almacenamiento Columnar}: A diferencia de JSON (orientado a filas), Arrow almacena los datos por columnas en su formato IPC (\textit{Inter-Process Communication}). Parquet también es columnar, pero comprime los datos en disco priorizando tamaño frente a velocidad; Arrow prioriza el acceso en memoria sin coste de descompresión, lo que lo hace más adecuado para lecturas repetidas durante el entrenamiento. Para datasets de NLP donde cada ejemplo tiene un único campo \texttt{text}, esto optimiza la velocidad de lectura secuencial en batches.
 
-    \item \textbf{Integración Nativa con Transformers}: La librería \texttt{transformers} de Hugging Face y \texttt{datasets} están construidas sobre Arrow internamente. Usar Arrow evita conversiones y permite que el framework optimice automáticamente la lectura en batches.
+    \item \textbf{Integración Nativa con Transformers}: La librería \texttt{datasets} de Hugging Face está construida sobre \texttt{pyarrow}~\cite{apachearrow}, la implementación Python de Apache Arrow. Usar Arrow evita conversiones intermedias y permite que el framework optimice automáticamente la lectura en batches mediante su \texttt{DataLoader}.
 
     \item \textbf{Tipificación Estricta}: Arrow impone esquemas tipificados (integer, string, float, etc.). Esto previene errores silenciosos donde un valor inesperado rompe downstream sin advertencia clara.
 \end{enumerate}
