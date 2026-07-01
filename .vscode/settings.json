@@ -19,9 +19,14 @@
     ],
     "latex-workshop.latex.recipes": [
         {
+            "name": "lualatex (rápido)",
+            "tools": ["lualatex"]
+        },
+        {
             "name": "lualatex → bibtex → lualatex × 2",
             "tools": ["lualatex", "bibtex", "lualatex", "lualatex"]
         }
     ],
+    "latex-workshop.latex.recipe.default": "lualatex (rápido)",
     "latex-workshop.latex.outDir": "%DIR%"
 }
