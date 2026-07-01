@@ -4,7 +4,8 @@
 El ciclo de vida del modelo culmina con su despliegue en un entorno de producción real, sustentado por una arquitectura de software robusta y procesos de gobernanza de código altamente automatizados.
 
 \subsection{Arquitectura de Servicios e Idempotencia}
-La pipeline de datos se ha diseñado siguiendo los principios \textbf{SOLID}, transformando scripts procedimentales en servicios especializados y desacoplados como \texttt{DatasetDownloader} y \texttt{DatasetProcessor}. Un pilar fundamental es la \textbf{idempotencia}: cada servicio verifica el estado del sistema antes de ejecutar operaciones costosas, optimizando el uso de recursos en la nube.
+La pipeline de datos se ha diseñado siguiendo los principios \textbf{SOLID}, transformando scripts procedimentales en servicios especializados y desacoplados.
+Un pilar fundamental es la \textbf{idempotencia}: cada servicio verifica el estado del sistema antes de ejecutar operaciones costosas, optimizando el uso de recursos en la nube.
 
 \subsection{Reproducibilidad y Gestión de Dependencias}
 Para garantizar que el modelo se ejecute en entornos idénticos (local, AWS, Kubernetes), se utiliza el gestor \textbf{uv} y su archivo de bloqueo \textbf{\texttt{uv.lock}}. Esto asegura el determinismo absoluto del entorno, optimiza la caché de Docker y proporciona seguridad mediante la verificación de \textit{hashes} criptográficos.
@@ -58,7 +59,7 @@ El módulo de infraestructura provisiona cuatro recursos principales:
 
     \item \textbf{Buckets S3}: tres buckets con responsabilidades separadas --- \texttt{tfm-slm-code} para el ZIP del código fuente, \texttt{tfm-slm-checkpoints} para los pesos del modelo (con versionado habilitado), y \texttt{tfm-slm-benchmarks} para los resultados de evaluación en formato JSON.
 
-    \item \textbf{Repositorio ECR} (\texttt{tfm-slm}): almacena la imagen Docker con \texttt{image\_tag\_mutability = MUTABLE} y política de ciclo de vida que retiene únicamente la última imagen, minimizando costes de almacenamiento.
+    \item \textbf{Repositorio ECR} (\texttt{tfm-slm}): almacena la imagen Docker con mutabilidad de etiquetas activada y política de ciclo de vida que retiene únicamente la última imagen, minimizando costes de almacenamiento.
 
     \item \textbf{Roles IAM}: el perfil de instancia \texttt{tfm-slm-ec2-profile} otorga a la EC2 permisos de \texttt{EC2ContainerRegistryPowerUser} y \texttt{S3FullAccess}, eliminando la necesidad de credenciales estáticas en el contenedor.
 \end{enumerate}
@@ -495,7 +496,7 @@ El flujo operacional para desplegar una nueva versión del modelo es:
 \begin{enumerate}
     \item \textbf{Cambios en Git}: El usuario modifica los manifests en \texttt{argocd-cluster/manifests/} (ej: actualizar etiqueta de imagen, cambiar configuración de memoria).
 
-    \item \textbf{Commit y Push}: Los cambios se commiterizean en el repositorio Git local (simulado con Git daemon en la máquina del desarrollador).
+    \item \textbf{Commit y Push}: Los cambios se registran con \texttt{git commit \&\& git push} en el repositorio Git local (simulado con Git daemon en la máquina del desarrollador).
 
     \item \textbf{Detección de ArgoCD}: ArgoCD monitorea continuamente el repositorio y detecta divergencia entre Git y el clúster en menos de 3 segundos (configurable).
 
