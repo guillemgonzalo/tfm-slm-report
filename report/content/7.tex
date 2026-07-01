@@ -26,6 +26,48 @@ Benchmark (val) & 1,091 & Evaluación sobre 300.000 muestras en conjunto indepen
 La convergencia fue estable en todas las épocas: el ratio GRU/Attn se mantuvo en el rango \texttt{WELL BALANCED} (0,5--1,5) confirmando que ambos componentes contribuyeron al aprendizaje sin que ninguno dominara. La ausencia de divergencia entre training loss y val\_loss indica que el modelo no incurrió en overfitting severo; el déficit de datos respecto al óptimo de Chinchilla (4,7$\times$ menos tokens) mantuvo el entrenamiento en régimen de \textit{underfitting} moderado durante las quince épocas, que es la causa principal de las limitaciones en generación libre descritas en el Capítulo~\ref{sec:conclusiones}.
 
 % ---------------------------------------------------------------
+\subsection{Benchmarks Zero-Shot Comparables con SmolLM2}
+\label{subsec:lmeval}
+
+Para obtener resultados directamente comparables con los publicados por SmolLM2, se implementó el script \texttt{app/benchmark\_lmeval.py}, que replican la metodología estándar de \texttt{lm-evaluation-harness}~\cite{eval-harness} sobre los mismos datasets: \textbf{HellaSwag} (validation, 10.042 ejemplos), \textbf{ARC-Easy} y \textbf{ARC-Challenge} (test split, 2.376 y 1.172 ejemplos respectivamente) y \textbf{PIQA} (validation, 1.838 ejemplos).
+
+\subsubsection*{Metodología}
+
+Para cada ejemplo de opción múltiple, el script tokeniza el contexto concatenado con cada opción de respuesta y calcula la log-probabilidad acumulada del modelo sobre los tokens de la opción, normalizada por longitud (\textit{acc\_norm}, length-normalized log-likelihood). La opción con mayor log-prob promedio se toma como predicción; la exactitud se computa como porcentaje de aciertos frente al label real. El preprocesamiento de HellaSwag es idéntico al del harness oficial: limpieza de tags \texttt{[header]}/\texttt{[title]} y combinación de \texttt{activity\_label + ctx\_a + ctx\_b}. Los resultados se exportan a \texttt{.output/benchmark\_lmeval.json} y se sincronizan a S3.
+
+\subsubsection*{Resultados}
+
+La evaluación se ejecutó sobre el checkpoint final (\texttt{.output/checkpoint.pt}) en hardware Apple Silicon (MPS), con el mismo tokenizador GPT-2 usado durante el entrenamiento.
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{|l|c|c|c|c|X|}
+\hline
+\textbf{Benchmark} & \textbf{Opciones} & \textbf{Azar} & \textbf{tfm-slm} & \textbf{SmolLM2-135M} & \textbf{Δ vs azar} \\ \hline
+HellaSwag & 4 & 25,00\% & 25,07\% & 42,1\% & +0,07\% \\ \hline
+ARC-Easy & 4 & 25,00\% & 28,49\% & 43,9\% & +3,49\% \\ \hline
+ARC-Challenge & 4 & 25,00\% & 22,78\% & 43,9\%$^*$ & \textbf{$-$2,22\%} \\ \hline
+PIQA & 2 & 50,00\% & 56,64\% & 68,4\% & +6,64\% \\ \hline
+ARC (media) & 4 & 25,00\% & 25,64\% & 43,9\% & +0,64\% \\ \hline
+\end{tabularx}
+\caption{Benchmarks zero-shot del tfm-slm vs SmolLM2-135M. $^*$SmolLM2 reporta ARC como media Easy+Challenge. Evaluación tfm-slm en MPS; SmolLM2 con \texttt{lighteval} en zero-shot (fuente: model card HuggingFace).}
+\label{tab:lmeval}
+\end{table}
+
+\subsubsection*{Análisis}
+
+Los resultados revelan que el tfm-slm opera \textbf{en el rango del azar} en los benchmarks de razonamiento de sentido común:
+
+\begin{itemize}
+    \item \textbf{HellaSwag (25,07\%)}: estadísticamente indistinguible del azar (25,00\%). El modelo no ha desarrollado ninguna capacidad de completar escenarios de sentido común.
+    \item \textbf{ARC-Easy (28,49\%)}: ligeramente por encima del azar ($+$3,49 pp), señal mínima pero real dado el tamaño muestral ($n = 2.376$).
+    \item \textbf{ARC-Challenge (22,78\%)}: \textbf{por debajo del azar} ($-$2,22 pp). Indica un sesgo del modelo hacia respuestas cortas o más frecuentes que le perjudica en preguntas de razonamiento complejo con opciones similares.
+    \item \textbf{PIQA (56,64\%)}: el único benchmark con señal genuina (+6,64 pp sobre el azar binario). Las tareas de conocimiento físico básico («¿cómo se limpia una sartén?») se benefician de haber entrenado sobre corpus de diálogo instrucción-respuesta, que frecuentemente contiene este tipo de razonamiento procedimental.
+\end{itemize}
+
+El gap respecto a SmolLM2-135M oscila entre 15 y 17 puntos porcentuales en HellaSwag y ARC, y 12 puntos en PIQA. Esta brecha es demasiado amplia para atribuirla a diferencias metodológicas menores entre implementaciones del harness; refleja directamente la diferencia en volumen de entrenamiento (713M tokens frente a 2T), que es el factor determinante para el desarrollo de capacidades emergentes de razonamiento.
+
+% ---------------------------------------------------------------
 \subsection{Entorno y Configuración del Benchmark}
 
 La evaluación se ejecuta sobre la instancia \texttt{g7e.2xlarge} equipada con una GPU \textbf{NVIDIA RTX PRO 6000 Server} (96 GB VRAM), el mismo hardware utilizado para el entrenamiento final. A lo largo del proyecto se emplearon tres generaciones de hardware de forma progresiva: la NVIDIA L4 (24 GB, instancia \texttt{g6.2xlarge}) en las fases iniciales de experimentación con un pico de uso de $\approx$20 GB; la NVIDIA L40S (48 GB, instancia \texttt{g6e.2xlarge}) en fases intermedias con un pico de $\approx$40 GB; y la RTX PRO 6000 (96 GB, instancia \texttt{g7e.2xlarge}) para el entrenamiento y benchmarking final, con un pico de 66,76 GB sobre los 300.000 samples con batch 64. Esta progresión garantiza que las métricas de latencia y throughput son representativas del entorno operacional real.
@@ -123,13 +165,7 @@ Los picos de pérdida por batch observados en el log (valores ocasionales superi
 \subsection{Comparativa con Modelos de Referencia}
 \label{subsec:comparativa}
 
-El modelo más próximo en tamaño al tfm-slm es \textbf{SmolLM2}~\cite{allal2025smollm2}, la familia de SLMs publicada por Hugging Face en tres variantes: 135M, 360M y 1.7B parámetros. El tfm-slm, con 167M parámetros, se sitúa entre las dos variantes más pequeñas.
-
-\subsubsection*{Advertencia metodológica}
-
-Las métricas del tfm-slm (pérdida cross-entropy, perplejidad y Top-$k$ accuracy) se calculan sobre \textbf{predicción del siguiente token en datos en distribución}: 300.000 muestras del mismo dataset mixto usado en el entrenamiento. Los benchmarks estándar de SmolLM2 (HellaSwag, ARC, PIQA, Winogrande) son tareas de \textbf{razonamiento de sentido común en zero-shot}: el modelo debe completar frases diseñadas ad hoc, procedentes de dominios totalmente distintos al training. Las métricas no son directamente comparables; la siguiente tabla contextualiza los modelos en las dimensiones que sí son objetivamente comparables.
-
-\subsubsection*{Comparativa estructural}
+El modelo más próximo al tfm-slm en tamaño es \textbf{SmolLM2}~\cite{allal2025smollm2}: 135M y 360M de parámetros. El tfm-slm, con 167M, se sitúa entre ambas variantes. La diferencia estructural más relevante no es la arquitectura sino el volumen de entrenamiento.
 
 \begin{table}[H]
 \centering
@@ -140,32 +176,49 @@ SmolLM2-135M & 135M & 2T & Transformer & 723 MB \\ \hline
 \textbf{tfm-slm (este TFM)} & \textbf{167M} & \textbf{0,71T} & \textbf{GRU+Attn} & \textbf{637 MB} \\ \hline
 SmolLM2-360M & 360M & 4T & Transformer & $\approx$1,4 GB \\ \hline
 \end{tabularx}
-\caption{Comparativa estructural entre tfm-slm y SmolLM2. Los tokens de entrenamiento del tfm-slm incluyen las 15 épocas sobre el dataset de 46.439 muestras.}
+\caption{Comparativa estructural entre tfm-slm y SmolLM2. Los tokens del tfm-slm incluyen las 15 épocas sobre 46.439 muestras.}
 \label{tab:comparativa_modelos}
 \end{table}
 
-\subsubsection*{Benchmarks estándar de SmolLM2}
+Los resultados de los benchmarks zero-shot (Sección~\ref{subsec:lmeval}) muestran una brecha de 15--17 puntos en HellaSwag y ARC, y 12 en PIQA. SmolLM2-135M se entrenó con 2T tokens --- casi $3\times$ el óptimo de Chinchilla para ese tamaño. El tfm-slm utilizó 713M (el 21\% del mínimo recomendado), insuficiente para el desarrollo de capacidades generativas emergentes. La arquitectura GRU+Attn es estructuralmente más expresiva por capa, pero no puede compensar el sub\-en\-tren\-a\-mien\-to: el trabajo futuro prioritario es \textbf{ampliar el corpus}, no rediseñar la arquitectura.
 
-La siguiente tabla recoge los resultados de SmolLM2 en zero-shot sobre benchmarks de razonamiento de sentido común~\cite{allal2025smollm2}. El tfm-slm \textbf{no fue evaluado} en estos benchmarks, dado que requieren capacidades emergentes de razonamiento que no se desarrollan con el volumen de datos disponible (véase análisis Chinchilla en la Sección~\ref{sec:evaluacion}):
+% ---------------------------------------------------------------
+\subsection{Evaluación Cualitativa: Generación Libre}
+\label{subsec:qualitative}
 
-\begin{table}[H]
-\centering
-\begin{tabularx}{\textwidth}{|l|c|c|c|c|c|}
-\hline
-\textbf{Modelo} & \textbf{HellaSwag} & \textbf{ARC} & \textbf{PIQA} & \textbf{Winogrande} & \textbf{MMLU} \\ \hline
-SmolLM2-135M & 42,1\% & 43,9\% & 68,4\% & 51,3\% & 31,5\% \\ \hline
-SmolLM2-360M & 54,5\% & 53,0\% & 71,7\% & 52,5\% & 35,8\% \\ \hline
-\textbf{tfm-slm} & \multicolumn{5}{c|}{No evaluado$^*$} \\ \hline
-\end{tabularx}
-\caption{Benchmarks zero-shot de SmolLM2 (fuente: model cards de Hugging Face). Evaluados con \texttt{lighteval} en zero-shot excepto GSM8K (5-shot). $^*$El tfm-slm no fue evaluado en estos benchmarks: requieren razonamiento emergente que no se desarrolla con el volumen de datos disponible.}
-\label{tab:smollm2_benchmarks}
-\end{table}
+Las métricas cuantitativas no capturan la calidad de generación libre, que es el uso final del modelo. Para evaluarla, se ejecutaron 10 prompts de distintas categorías (factual, creativo, instruccional, traducción, narrativo) con temperatura 0,7--0,8 y un límite de 128 tokens, registrando las respuestas para análisis. El análisis revela cuatro modos de fallo sistemáticos.
 
-\subsubsection*{Análisis}
+\subsubsection*{Bucles de repetición}
 
-La diferencia estructural más relevante entre el tfm-slm y SmolLM2-135M no es la arquitectura ni los parámetros, sino el \textbf{volumen de entrenamiento}. SmolLM2-135M se entrenó con 2T tokens --- casi $3\times$ el óptimo de Chinchilla para ese tamaño. El tfm-slm utilizó 713 millones, el 21\% del mínimo recomendado para 167M de parámetros. Este déficit explica que SmolLM2-135M, con 32M menos de parámetros, haya desarrollado capacidades de razonamiento emergentes que el tfm-slm no alcanza.
+El fallo más frecuente: el modelo queda atrapado generando el mismo token o frase hasta alcanzar el límite.
 
-La arquitectura GRU+Attn es estructuralmente más expresiva por capa que el Transformer puro de SmolLM2, pero esa densidad no puede compensar el sub\-en\-tren\-a\-mien\-to: sin suficientes ejemplos, los pesos no convergen a las representaciones que dan lugar a capacidades generativas. El trabajo futuro prioritario es \textbf{ampliar el corpus}, no rediseñar la arquitectura.
+\begin{itemize}
+    \item \textbf{``What is the capital of France?''}: el modelo conoce la respuesta pero no puede detener la generación: \textit{``The capital of France is the capital of France, which is the capital of France. It is the capital of France, which is the capital of France...''} (8 repeticiones).
+    \item \textbf{``Give me a recipe for a simple sandwich.''}: tras una línea de apertura, bucle de ingrediente único: \textit{``mix together the eggs, eggs, eggs, eggs, eggs, eggs...''} (32 repeticiones del mismo token).
+    \item \textbf{``What are the benefits of exercise?''}: lista parcialmente correcta que degenera en \textit{``Improved sleep''} repetido 10 veces seguidas.
+\end{itemize}
+
+\subsubsection*{Eco del formato de entrenamiento}
+
+El modelo regurgita la estructura del corpus en lugar de responder al prompt:
+
+\begin{itemize}
+    \item \textbf{``Translate `good morning' to Spanish.''}: responde con \textit{``Open Assistant, Open Assistant, Open Assistant,''} repetido 43 veces. El modelo aprendió que \textit{Open~Assistant} es un inicio de turno válido en el corpus, pero no qué contenido debe seguirle.
+    \item \textbf{``List three healthy breakfast ideas.''}: genera \textit{``Open Assistant: Open Assistant will be able to read and write''}, sobreponiendo el rol del dataset al contenido solicitado.
+\end{itemize}
+
+\subsubsection*{Contaminación de idioma}
+
+Con temperatura 0,7, el prompt en inglés \textbf{``Write a short poem about the sea.''} produce: \textit{``Ense de la lista de la lista con la lista.''} --- respuesta en español fragmentado, sin relación con el tema. El corpus OpenAssistant es multilingüe y el modelo no discrimina el idioma de salida.
+
+\subsubsection*{Desconexión semántica}
+
+\begin{itemize}
+    \item \textbf{``Explain what a neural network is in one sentence.''}: \textit{``The neural network is in a chatbot and the chatbot.''} La única verdad es que el modelo es efectivamente un chatbot.
+    \item \textbf{``Continue this story: Once upon a time, in a distant land,''}: \textit{``Now, please, to explain it. [Your Name].''} Ignora por completo el contexto narrativo.
+\end{itemize}
+
+Estos fallos son cualitativamente distintos de los errores de un modelo suficientemente entrenado: no son errores de conocimiento sino de \textbf{coherencia generativa}. Un modelo correctamente entrenado puede equivocarse en una pregunta, pero no entra en bucles de repetición ni confunde su propio rol con el del usuario. La taxonomía de fallos confirma que 713M de tokens son insuficientes para estabilizar las estructuras atencionales y recurrentes necesarias para la generación coherente de lenguaje.
 
 % ---------------------------------------------------------------
 \subsection{Resumen de Resultados}
