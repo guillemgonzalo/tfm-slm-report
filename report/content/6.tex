@@ -222,6 +222,44 @@ flash_attn-2.8.3+cu12torch2.11cxx11abiTRUE-cp313-cp313-linux_x86_64.whl"; \
 La instalación es condicional a la arquitectura: en hosts \texttt{x86\_64} (instancias EC2 G-family) se descarga e instala el wheel directamente; en arquitecturas ARM (desarrollo local en Apple Silicon, por ejemplo) el paso se omite y el modelo cae back a \texttt{scaled\_dot\_product\_attention} de PyTorch. Esto hace que la imagen sea construible en cualquier máquina sin CUDA, mientras que en producción siempre se activa Flash Attention. El pipeline de despliegue completo se describe en el Capítulo~\ref{sec:mlops}.
 
 % ---------------------------------------------------------------
+\subsection{Bucle de Entrenamiento}
+\label{subsec:training_loop}
+
+El bucle de entrenamiento implementado en \texttt{app/training/trainer.py} integra las nueve mejoras anteriores en una pipeline optimizada para hardware NVIDIA Blackwell.
+
+\subsubsection*{Optimizador y scheduler de tasa de aprendizaje}
+
+El optimizador es \textbf{AdamW} con tasa base $\eta = 5 \times 10^{-5}$ y \textit{weight decay} de 0,01. El scheduler sigue \textbf{CosineAnnealingWarmRestarts}: se reserva un 10\% de los pasos totales como warmup de estabilización inicial; el resto del entrenamiento sigue una curva cosenoidal que decae hasta $\eta_{\min} = \eta / 100 = 5 \times 10^{-7}$, evitando que el optimizador oscile en mínimos locales en las épocas finales.
+
+\subsubsection*{Precisión mixta y compilación}
+
+El entrenamiento usa \textbf{bfloat16} en GPUs que lo soportan (RTX PRO 6000, L40S), lo que evita el \textit{loss scaling} requerido por float16 y simplifica el código del scaler. Se activa \texttt{torch.set\_float32\_matmul\_precision("high")} para habilitar TF32 en las multiplicaciones matriciales de las unidades Tensor Core. El modelo se compila con \texttt{torch.compile} \textit{después} de cargar el checkpoint, evitando incompatibilidades entre los prefijos de nombres de \texttt{torch.compile} y los \texttt{state\_dict} guardados:
+
+\begin{verbatim}
+torch.set_float32_matmul_precision("high")   # TF32 en Tensor Cores
+model = torch.compile(model, options={
+    "triton.cudagraphs": False,
+    "max_autotune": True,
+})
+\end{verbatim}
+
+\subsubsection*{Estrategia de checkpoint y reanudación}
+
+Al final de cada época se guarda un checkpoint en \texttt{.output/checkpoint.pt} con el estado completo del entrenamiento: \texttt{model\_state\_dict} (extraído de \texttt{model.\_orig\_mod} para evitar prefijos de \texttt{torch.compile}), \texttt{optimizer\_state\_dict}, \texttt{scheduler\_state\_dict}, \texttt{epoch}, \texttt{global\_step} y \texttt{loss} medio de la época.
+
+Inmediatamente después del guardado local, el checkpoint se sincroniza al bucket S3 configurado. Al iniciar el entrenamiento, el sistema busca primero el checkpoint local; si no existe, lo descarga desde S3. Esta secuencia garantiza que un reinicio de la instancia EC2 (ante una interrupción \textit{spot}) reanuda el entrenamiento desde la última época completada sin pérdida de progreso.
+
+\subsubsection*{Cadencia de métricas}
+
+Las métricas se registran con dos frecuencias distintas:
+
+\begin{itemize}
+    \item \textbf{Cada 100 pasos} (\texttt{log\_metrics\_every=100}): training loss, GRU norm, Attn norm, MLP norm, ratio GRU/Attn y grad\_norm antes y después del clipping. Se persisten en el \texttt{HybridArchitectureAnalyzer}.
+    \item \textbf{Cada 500 pasos} (\texttt{validate\_every=500}): se añade \texttt{val\_loss} al registro del paso.
+    \item \textbf{Al final de cada época}: \texttt{analyzer.save\_metrics()} exporta el historial completo a \texttt{.output/metrics.json} y \texttt{analyzer.print\_summary()} imprime el loss final, mínimo y medio de la época junto al rango del ratio GRU/Attn observado.
+\end{itemize}
+
+% ---------------------------------------------------------------
 \subsection{Impacto Cuantificable en la Convergencia}
 
 Las mejoras arquitectónicas tienen impacto medible y significativo en la convergencia del modelo durante el entrenamiento desde cero.
@@ -266,7 +304,8 @@ service = TrainingService(dataset_path=".datasets/mixed_dataset")
 service.train(
     epochs=5,
     batch_size=64,
-    learning_rate=1e-4,
+    grad_accum_steps=2,
+    lr=5e-5,
     grad_clip_norm=1.0,
     log_metrics_every=100,
     validate_every=500,
