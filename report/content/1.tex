@@ -62,7 +62,7 @@ El objetivo principal es diseñar, implementar y validar esta arquitectura híbr
 \begin{enumerate}
     \item \textbf{Arquitectura híbrida Transformer-GRU}: diseño e implementación de un bloque híbrido con estados GRU persistentes, validando su convergencia y estabilidad frente a la arquitectura original mediante métricas de gradiente y pérdida
     \item \textbf{Benchmark exhaustivo}: evaluación cuantitativa de 10 métricas sobre 300.000 muestras de validación, con análisis de estabilidad y diagnóstico honesto de las limitaciones cualitativas del modelo resultante
-    \item \textbf{Pipeline de ingeniería end-to-end}: implementación completa desde Entrenamiento hasta despliegue en producción, incluyendo infraestructura cloud y automatización de testing
+    \item \textbf{Pipeline de ingeniería completo}: implementación end-to-end desde entrenamiento hasta despliegue en producción, incluyendo infraestructura cloud y automatización de testing
 \end{enumerate}
 
 \subsection{Estructura del Documento}
@@ -74,10 +74,11 @@ El objetivo principal es diseñar, implementar y validar esta arquitectura híbr
     \item \textbf{Capítulo 5}: Diseño e implementación de la arquitectura híbrida --- visión general del modelo decoder-only, especificaciones técnicas y comparativa con SmolLM2-135M
     \item \textbf{Capítulo 6}: Mejoras arquitectónicas e implementación --- proceso iterativo de desarrollo: limitaciones del diseño inicial, 9 mejoras aplicadas (estados GRU persistentes, reorden de componentes, inicialización ortogonal, gradient clipping, Flash Attention, etc.) y diseño final del HybridBlock
     \item \textbf{Capítulo 7}: Evaluación y benchmarking --- 10 métricas de calidad, eficiencia y recursos sobre 300.000 muestras
-    \item \textbf{Capítulo 8}: Infraestructura cloud --- ecosistema AWS, hardware G6/G6e/G7e, Terraform, optimización de VRAM y progresión de hardware
-    \item \textbf{Capítulo 9}: MLOps: despliegue y puesta en producción --- CI/CD, reproducibilidad, Rulesets, testing automatizado, Terraform e infraestructura GitOps con Kubernetes y ArgoCD
-    \item \textbf{Capítulo 10}: Análisis de costes --- coste de infraestructura GPU por ciclo de entrenamiento y coste humano equivalente de un ingeniero junior en Data Science
-    \item \textbf{Capítulo 11}: Conclusiones y trabajo futuro
+    \item \textbf{Capítulo 8}: Infraestructura cloud --- hardware G6/G6e/G7e, comparativa GPU, optimización de VRAM y progresión de instancias AWS
+    \item \textbf{Capítulo 9}: MLOps: despliegue y puesta en producción --- CI/CD, Terraform, testing automatizado e infraestructura GitOps con Kubernetes y ArgoCD
+    \item \textbf{Capítulo 10}: Análisis de costes --- coste de infraestructura GPU por ciclo y coste humano equivalente de un ingeniero junior en Data Science
+    \item \textbf{Capítulo 11}: Consideraciones éticas y sociales --- impacto medioambiental, sesgos en datos, uso responsable y democratización de la IA
+    \item \textbf{Capítulo 12}: Conclusiones y trabajo futuro --- limitaciones del entrenamiento desde cero, lecciones aprendidas y líneas de trabajo futuro
     \item \textbf{Anexo A}: Guía rápida de comandos
-    \item \textbf{Anexo B}: Configuración del backend
+    \item \textbf{Anexo B}: Configuración del backend (AWS, S3, Terraform)
 \end{itemize}
