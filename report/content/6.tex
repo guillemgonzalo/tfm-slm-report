@@ -272,7 +272,7 @@ Las mejoras arquitectónicas tienen impacto medible y significativo en la conver
     \item \textbf{Mejora}: $\sim$15\% más rápido en convergencia inicial
 \end{itemize}
 
-Esta mejora en velocidad acelera todo el ciclo de entrenamiento. Con 5 épocas, un 15\% de mejora en convergencia temprana se traduce en horas ahorradas por ciclo de GPU.
+Esta mejora en velocidad acelera todo el ciclo de entrenamiento. Con 15 épocas, un 15\% de mejora en convergencia temprana se traduce en horas ahorradas por ciclo de GPU.
 
 \subsubsection{Estabilidad de Gradientes}
 
@@ -302,7 +302,7 @@ from app.training.trainer import TrainingService
 service = TrainingService(dataset_path=".datasets/mixed_dataset")
 
 service.train(
-    epochs=5,
+    epochs=15,
     batch_size=64,
     grad_accum_steps=2,
     lr=5e-5,
