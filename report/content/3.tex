@@ -53,7 +53,7 @@ Antes de entrar al primer bloque, cada token de la secuencia se convierte en un 
 
 El modelo propuesto utiliza el vocabulario del tokenizador GPT-2 con $|V| = 50\,257$ y $d_{model} = 768$, resultando en una matriz de embedding de $50\,257 \times 768 = 38{,}6\text{M}$ parámetros. Para reducir el coste de memoria, los pesos de esta capa se comparten con la cabeza de predicción final (\textit{weight tying}): $W_{lm\_head} = E^\top$.
 
-El mecanismo de atención es invariante a la permutación: procesa el conjunto $\{e_1, \ldots, e_L\}$ sin noción de orden. Para dotar al modelo de información posicional, se añade un vector de codificación $p_t$ a cada embedding de entrada antes del primer bloque. La formulación sinusoidal original de Vaswani et al.~\cite{vaswani2017attention} define:
+El mecanismo de atención es invariante a la permutación: procesa $\{e_1, \ldots, e_L\}$ sin noción de orden. Para dotar al modelo de información posicional, se añade un vector $p_t$ a cada embedding antes del primer bloque. La formulación sinusoidal de Vaswani et al.~\cite{vaswani2017attention} define:
 
 \begin{equation}
     PE_{(t,\,2i)} = \sin\!\left(\frac{t}{10000^{2i/d_{model}}}\right), \quad
