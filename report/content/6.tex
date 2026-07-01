@@ -1,4 +1,4 @@
-\section[Mejoras Arquitectónicas e Implementación]{Mejoras Arquitectónicas e Implementación del Modelo Híbrido}
+\section[Mejoras del Modelo Híbrido]{Mejoras Arquitectónicas e Implementación}
 \label{sec:implementation}
 
 El diseño de un SLM híbrido requiere integrar dos paradigmas computacionales distintos: la atención global de los Transformers y la memoria secuencial de las unidades recurrentes. El Capítulo~\ref{sec:arquitectura} describe la arquitectura final resultante; este capítulo documenta el proceso iterativo que llevó hasta ella: qué limitaciones presentaba el diseño inicial y qué decisiones de ingeniería se tomaron para superarlas.
@@ -176,7 +176,9 @@ El mecanismo de Multi-Head Attention estándar calcula la salida como:
     \text{Attention}(Q, K, V) = \text{softmax}\!\left(\frac{QK^\top}{\sqrt{d_k}}\right) V
 \end{equation}
 
-donde $Q, K, V \in \mathbb{R}^{L \times d_k}$. La implementación naïve materializa la matriz $S = QK^\top / \sqrt{d_k} \in \mathbb{R}^{L \times L}$ en HBM (\textit{High Bandwidth Memory}), aplica softmax y la almacena antes de multiplicar por $V$. Para $L = 1024$, 12 cabezas y $d_k = 64$, cada capa ocupa $12 \times 1024^2 \times 4 \approx 50\text{ MB}$, acumulando $\sim\!600\text{ MB}$ a lo largo de los 12 bloques.
+donde $Q, K, V \in \mathbb{R}^{L \times d_k}$. La implementación naïve materializa la matriz de scores $S \in \mathbb{R}^{L \times L}$ en HBM (\textit{High Bandwidth Memory}), aplica softmax y la almacena antes de multiplicar por $V$.
+
+Para $L = 1024$, 12 cabezas y $d_k = 64$, cada capa ocupa $12 \times 1024^2 \times 4 \approx 50\text{ MB}$, acumulando $\sim\!600\text{ MB}$ a lo largo de los 12 bloques.
 
 El coste real no es el cómputo aritmético (que sí es $O(L^2 d)$ en FLOPs), sino el número de accesos a HBM: en GPUs modernas, la memoria de alta capacidad HBM tiene un ancho de banda de $\sim$3.2 TB/s (NVIDIA L4), mientras que la SRAM on-chip (\textit{cache}) es órdenes de magnitud más rápida pero limitada en tamaño ($\sim$20 MB en L4). La atención estándar requiere $O(L^2)$ lecturas y escrituras HBM —la transferencia, no el cómputo, es el cuello de botella.
 
