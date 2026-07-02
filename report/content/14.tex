@@ -108,7 +108,7 @@ ssh -i "tfm-slm.pem" ec2-user@<IP> tail -f /var/log/user-data.log
 
 \subsection*{Notas}
 \begin{itemize}
-    \item \textbf{S3 Native Locking}: Terraform usa \texttt{use\_lockfile = true} (no requiere DynamoDB).
+    \item \textbf{S3 Native Locking}: Terraform usa \texttt{use\_lockfile}~=~\texttt{true} (no requiere DynamoDB).
     \item \textbf{Credenciales AWS}: Se leen automáticamente desde \texttt{\textasciitilde/.aws/credentials}.
     \item \textbf{Región}: Todos los buckets en \texttt{eu-south-2}.
     \item \textbf{Nombres únicos}: Los nombres de buckets S3 son globales en AWS. Si ya existen, usar nombres distintos en \texttt{deploy.py} y \texttt{terraform.tfvars}.
