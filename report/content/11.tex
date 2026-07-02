@@ -35,7 +35,7 @@ Estas limitaciones no invalidan el valor técnico del proyecto, pero sí estable
 % ---------------------------------------------------------------
 \subsection{Uso Responsable y Limitaciones de Despliegue}
 
-El tfm-slm es un modelo experimental con capacidades generativas limitadas por el volumen de entrenamiento (713M tokens, frente a los $\approx$3.340M óptimos según Chinchilla). Las métricas cuantitativas son satisfactorias (PPL=2,98, Top-1=79,75\%), pero la evaluación cualitativa evidencia que el modelo no es apto para generación libre coherente en escenarios de producción real.
+El tfm-slm es un modelo experimental con capacidades generativas limitadas por el volumen de datos únicos de entrenamiento (354,8M tokens, frente a los $\approx$3.340M óptimos según Chinchilla). El benchmark original (PPL=2,98, Top-1=79,75\%) se midió sobre datos ya vistos durante el entrenamiento, al no existir un holdout real en el pipeline que generó esos resultados; la reevaluación posterior sobre una partición disjunta genuina (Sección~\ref{subsec:benchmark_corregido}) --- 148.437 muestras nunca vistas durante el entrenamiento --- arroja un panorama más honesto y notablemente peor: PPL=4,96, Top-1=68,25\%. La evaluación cualitativa confirma, en línea con esta corrección, que el modelo no es apto para generación libre coherente en escenarios de producción real.
 
 En consecuencia, se establecen las siguientes restricciones de uso recomendadas:
 
