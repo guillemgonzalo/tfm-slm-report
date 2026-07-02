@@ -93,7 +93,7 @@ Las leyes de escala establecidas por Hoffmann et al.~\cite{hoffmann2022chinchill
     \label{fig:cost_comparison}
 \end{figure}
 
-La alternativa más próxima en la literatura, SmolLM2-135M~\cite{allal2024smollm}, fue entrenada con \textbf{600 mil millones de tokens} curados a través de una pipeline de datos masiva que incluyó filtrado semántico, deduplicación y mezcla de múltiples fuentes de alta calidad. Esta diferencia de tres órdenes de magnitud (238M vs 600B tokens) explica la brecha cualitativa entre ambos modelos.
+La alternativa más próxima en la literatura, SmolLM2-135M~\cite{allal2025smollm2}, fue entrenada con \textbf{2 billones (2T) de tokens} curados a través de una pipeline de datos masiva que incluyó filtrado semántico, deduplicación y mezcla de múltiples fuentes de alta calidad. Esta diferencia de casi tres órdenes de magnitud (713M vs 2T tokens, ratio $\approx$\,2.800:1) explica la brecha cualitativa entre ambos modelos.
 
 \subsubsection{Fine-tuning como Alternativa Viable}
 
@@ -138,7 +138,7 @@ Los costes de cómputo para alcanzar capacidades emergentes en un LLM/SLM son su
 
 \subsubsection{Evolución del hardware: de L4 a RTX PRO 6000}
 
-El proyecto recorrió una progresión de hardware a lo largo del ciclo de desarrollo. Las fases iniciales de experimentación y benchmarking se ejecutaron sobre instancias \texttt{g6.2xlarge} equipadas con \textbf{NVIDIA L4} (24 GB VRAM), suficientes para validar la arquitectura y medir métricas en lotes pequeños. A medida que el batch size objetivo aumentó y la necesidad de secuencias más largas se hizo evidente, se migró a instancias \texttt{g6e.2xlarge} con \textbf{NVIDIA L40S} (48 GB VRAM) como paso intermedio. El entrenamiento final se ejecutó sobre instancias \texttt{g7e.2xlarge} con \textbf{NVIDIA RTX PRO 6000 Server} (96 GB VRAM), que permitieron alcanzar el batch efectivo de 32 con un 97\% de utilización GPU sin recurrir a acumulación de gradientes agresiva. Esta progresión ilustra que la elección del hardware de entrenamiento no es una decisión única sino un parámetro que evoluciona con el proyecto.
+El proyecto recorrió una progresión de hardware a lo largo del ciclo de desarrollo. Las fases iniciales de experimentación y benchmarking se ejecutaron sobre instancias \texttt{g6.2xlarge} equipadas con \textbf{NVIDIA L4} (24 GB VRAM), suficientes para validar la arquitectura y medir métricas en lotes pequeños. A medida que el batch size objetivo aumentó y la necesidad de secuencias más largas se hizo evidente, se migró a instancias \texttt{g6e.2xlarge} con \textbf{NVIDIA L40S} (48 GB VRAM) como paso intermedio. El entrenamiento final se ejecutó sobre instancias \texttt{g7e.2xlarge} con \textbf{NVIDIA RTX PRO 6000 Server} (96 GB VRAM), que permitieron alcanzar el batch efectivo de 128 (batch 64, acumulación 2) con un 97\% de utilización GPU. Esta progresión ilustra que la elección del hardware de entrenamiento no es una decisión única sino un parámetro que evoluciona con el proyecto.
 
 \subsubsection{Diseño de arquitecturas híbridas}
 
@@ -160,7 +160,7 @@ La acción de mayor impacto a corto plazo es sustituir el entrenamiento desde ce
 \begin{enumerate}
     \item Selección de un modelo base (SmolLM2-135M, Phi-3-mini, o GPT-2 Medium) con capacidades lingüísticas emergentes demostradas.
     \item Aplicación de LoRA~\cite{hu2021lora} sobre los datasets curados (OASST, Alpaca, ShareGPT, UltraChat) con rango $r \in \{8, 16, 32\}$ para explorar el trade-off eficiencia/calidad.
-    \item Evaluación mediante generación libre sobre el conjunto de prompts del \texttt{chat\_history.jsonl}, comparando resultados cualitativos directamente con los producidos por el modelo actual.
+    \item Evaluación mediante generación libre sobre el conjunto de prompts del historial de inferencia (\texttt{chat\_history.jsonl}), comparando resultados cualitativos directamente con los producidos por el modelo actual.
 \end{enumerate}
 
 Esta aproximación es factible en pocas horas de cómputo en la instancia \texttt{g7e.2xlarge} (NVIDIA RTX PRO 6000 Server, 96 GB VRAM) ya empleada en el proyecto, y produciría resultados directamente comparables con modelos del estado del arte.
@@ -177,7 +177,7 @@ Una vez validado el enfoque de fine-tuning, el siguiente paso arquitectónico es
 
 \subsubsection{Mejoras de Inferencia sin Reentrenamiento}
 
-Las sesiones de prueba manual documentadas en \texttt{mejoras/informe\_chat\_observaciones.md} revelaron fallos de generación que pueden mitigarse significativamente \textbf{sin modificar los pesos del modelo}, únicamente ajustando la lógica de inferencia en \texttt{app/inference.py}:
+Las sesiones de prueba manual documentadas en el informe de observaciones de chat (\texttt{informe\_chat\_obs\-er\-va\-ciones.md}) revelaron fallos de generación que pueden mitigarse significativamente \textbf{sin modificar los pesos del modelo}, únicamente ajustando la lógica de inferencia en \texttt{app/inference.py}:
 
 \begin{enumerate}
     \item \textbf{Repetition penalty.} El fallo más frecuente observado es el bucle de repetición: el modelo entra en un loop generando el mismo token o frase indefinidamente (e.g., ``Open Assistant, Open Assistant, \ldots'' o ``eggs, eggs, eggs, \ldots''). Aplicar un penalizador de repetición que reduzca la probabilidad de tokens ya generados recientemente cortaría estos bucles sin afectar la calidad en generación normal.
@@ -186,7 +186,7 @@ Las sesiones de prueba manual documentadas en \texttt{mejoras/informe\_chat\_obs
 
     \item \textbf{Formato de prompt Alpaca.} El 20\% del dataset de entrenamiento usa el formato estructurado \texttt{\#\#\# Instruction: / \#\#\# Response:}. Reformatear los prompts del chat con esta plantilla, en lugar de texto libre, alinea mejor la distribución de entrada con lo que el modelo ha visto durante el entrenamiento, mejorando la coherencia de las respuestas.
 
-    \item \textbf{Sampling más conservador.} La configuración actual (\texttt{temperature=0.8}, \texttt{top\_k=50}) favorece la diversidad sobre la coherencia. Reducir a \texttt{temperature=0.6}, \texttt{top\_k=30} limita el espacio de muestreo a tokens más probables, reduciendo derivas semánticas y respuestas incoherentes.
+    \item \textbf{Sampling más conservador.} La configuración actual favorece la diversidad sobre la coherencia (temperature~0.8, top-k~50). Reducir ambos parámetros (temperature~0.6, top-k~30) limita el espacio de muestreo a tokens más probables, reduciendo derivas semánticas.
 \end{enumerate}
 
 Estas cuatro mejoras son de bajo coste de implementación y alto impacto perceptible en la calidad de la demo, y constituyen el primer paso recomendado antes de abordar el reentrenamiento.
