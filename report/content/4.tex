@@ -95,6 +95,7 @@ UltraChat es el dataset más grande de la mezcla, enfatizando conversaciones lar
 \textbf{Rol en el Modelo}: UltraChat es fundamental para validar la arquitectura híbrida propuesta. Mientras que los Transformers puros pueden procesar contextos largos mediante su mecanismo de atención global, la arquitectura híbrida combina atención con GRU para mantener memoria secuencial. El volumen de datos de contexto largo de UltraChat permite que el modelo practique tanto el mecanismo de atención (capturando relaciones globales) como el GRU (refinando patrones secuenciales), entrenando efectivamente la verdadera hibridación arquitectónica.
 
 \subsubsection{The Stack (Python) - Gated, No Incluido}
+\label{subsec:the_stack}
 
 \textbf{Identificador}: \texttt{bigcode/the-stack}~\cite{kocetkov2022stack} (subconjunto: \texttt{data/python}) \\
 \textbf{Estado}: Comentado en configuración; requiere aprobación manual en Hugging Face \\
@@ -113,6 +114,7 @@ The Stack es un corpus de 11 terabytes de código fuente compilado a partir de r
 \textbf{Razón de Exclusión}: La naturaleza gated del dataset (requiere aprobación explícita en Hugging Face) añade fricción operacional incompatible con el requisito de reproducibilidad inmediata. Su configuración permanece comentada en \texttt{app/dataset/constants.py} y puede integrarse una vez obtenida la aprobación.
 
 \subsection{Estrategia de Mezcla: Ponderación y Proporción}
+\label{subsec:estrategia_mezcla}
 
 Cada dataset contribuye una proporción diferente al entrenamiento, diseñada para equilibrar cobertura y eficiencia:
 
@@ -120,14 +122,14 @@ Cada dataset contribuye una proporción diferente al entrenamiento, diseñada pa
 \centering
 \begin{tabularx}{\textwidth}{|l|c|c|X|}
 \hline
-\textbf{Dataset} & \textbf{Peso} & \textbf{Ejemplos} & \textbf{Justificación} \\ \hline
+\textbf{Dataset} & \textbf{Peso nominal} & \textbf{Ejemplos (objetivo)} & \textbf{Justificación} \\ \hline
 OpenAssistant & 30\% & ~103.932 ejemplos & Base de naturalidad conversacional \\ \hline
 UltraChat & 30\% & ~103.932 ejemplos & Validación de consistencia largo plazo y arquitectura híbrida \\ \hline
 Alpaca & 20\% & ~69.288 ejemplos & Señal de instruction-following estructurado \\ \hline
 ShareGPT & 20\% & ~69.287 ejemplos & Transferencia de estilos resolutivos avanzados \\ \hline
 \textbf{Total} & \textbf{100\%} & \textbf{346.439} & Equilibrio entre naturalidad, estructura y complejidad \\ \hline
 \end{tabularx}
-\caption{Distribución de pesos para mezcla de datasets de entrenamiento (346.439 muestras de 1.024 tokens cada una).}
+\caption{Pesos \textbf{nominales} de la mezcla de datasets (346.439 muestras de 1.024 tokens cada una). Los pesos son el objetivo de diseño; como se documenta en la Sección~\ref{subsec:mezcla_elastica}, dos de las cuatro fuentes (Alpaca, ShareGPT) tienen un tamaño real menor al que les correspondería por peso, por lo que la composición final por fuente no reproduce exactamente estos porcentajes.}
 \end{table}
 
 \begin{figure}[H]
@@ -150,6 +152,35 @@ Los pesos se eligieron mediante análisis de sesgo-varianza:
 \end{enumerate}
 
 El peso de UltraChat (30\%) es especialmente importante para esta arquitectura: mientras que un Transformer puro podría beneficiarse menos de contextos largos (por el costo cuadrático), la arquitectura híbrida con GRU está optimizada para explotar memoria secuencial eficiente. UltraChat permite que el modelo entrene esta capacidad diferencialmente.
+
+\subsubsection{Estrategia de Mezcla Elástica}
+\label{subsec:mezcla_elastica}
+
+Los pesos nominales de la Tabla anterior asumen que cada fuente puede aportar su cuota exacta. En la práctica, dos de las cuatro fuentes tienen un tamaño real menor al que les correspondería:
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{|l|c|c|}
+\hline
+\textbf{Fuente} & \textbf{Cuota pedida (peso)} & \textbf{Tamaño real disponible} \\ \hline
+OpenAssistant & $\approx$148.463 & 84.437 \\ \hline
+Alpaca & $\approx$98.975 & 52.002 \\ \hline
+ShareGPT & $\approx$98.975 & 76.920 \\ \hline
+UltraChat & $\approx$148.462 & 1.468.352 \\ \hline
+\end{tabularx}
+\caption{Cuota pedida frente a tamaño real disponible por fuente, para un objetivo de 494.876 muestras totales. OpenAssistant, Alpaca y ShareGPT quedan por debajo de su cuota; UltraChat tiene margen muy superior al suyo.}
+\label{tab:mezcla_elastica}
+\end{table}
+
+Recortar cada fuente a $\min(\text{cuota}, \text{tamaño real})$ deja el total corto: sumando los valores reales de la tabla se obtienen solo 361.821 muestras, muy por debajo del objetivo. La solución implementada en \texttt{DatasetProcessor.process} (\texttt{app/dataset/processor.py}) trata a UltraChat como fuente \textbf{elástica}, la única con margen suficiente (1,47M filas) para absorber el déficit de las demás:
+
+\begin{enumerate}
+    \item Se cargan primero las tres fuentes fijas (OpenAssistant, Alpaca, ShareGPT) a su cuota, o a su tamaño máximo si este es menor.
+    \item Se suma cuánto se obtuvo realmente de ellas (\texttt{fixed\_total}).
+    \item UltraChat se carga al final pidiendo exactamente \texttt{total\_samples - fixed\_total}, absorbiendo el déficit de las fuentes limitadas y garantizando que el total cuadre siempre con el objetivo, sin importar cuánto den las demás fuentes.
+\end{enumerate}
+
+El resultado verificado es: $84.437 + 52.002 + 76.920 + 281.517~(\text{UltraChat}) = \textbf{494.876}$ muestras exactas, divididas mediante \texttt{train\_test\_split(test\_size=148\_437, seed=42)} en \textbf{346.439 de entrenamiento} y \textbf{148.437 de benchmark}, genuinamente disjuntas. La estrategia es expandible: si el objetivo total cambia, o si el tamaño de alguna fuente crece o decrece en Hugging Face, el cálculo se reajusta automáticamente sin necesidad de hardcodear cifras por fuente --- solo el total objetivo y los pesos base están fijados en el código.
 
 \subsection{Procesamiento de Datos y Formato Apache Arrow}
 
@@ -213,19 +244,23 @@ Con la mezcla y ponderación descritas, el dataset consolidado tiene las siguien
 \hline
 \textbf{Métrica} & \textbf{Descripción} & \textbf{Valor} \\ \hline
 Muestras totales en dataset Arrow & Verificado sobre archivos \texttt{.arrow} & 346.439 \\ \hline
-\quad — usadas en entrenamiento & Primeras $N$ muestras (trainer) & 46.439 \\ \hline
-\quad — usadas en validación & Últimas 300.000 muestras (benchmark) & 300.000 \\ \hline
+\quad — usadas en entrenamiento & El \textit{trainer} itera sobre el 100\% del dataset en cada época, sin partición train/val & 346.439 (100\%) \\ \hline
+\quad — reservadas para validación & Ninguna: no existe holdout real en el pipeline que generó los resultados de este TFM & 0 \\ \hline
 Tokens por Muestra & Longitud fija (padding/truncation) & 1.024 tokens \\ \hline
 Contexto Máximo & Longitud máxima procesada por modelo & 1.024 tokens \\ \hline
 Vocabulario & Tokens únicos (GPT-2 tokenizer) & 50.257 \\ \hline
 Épocas de Entrenamiento & Ciclos completos sobre el dataset & 15 épocas \\ \hline
-Tokens por Época (entrenamiento) & $46.439 \times 1.024$ & ~47,6M tokens \\ \hline
-Total Tokens Procesados & $46.439 \times 1.024 \times 15$ & ~713M tokens \\ \hline
+Tokens Únicos del Corpus & $346.439 \times 1.024$ (una pasada) & ~354,8M tokens \\ \hline
+Tokens Procesados (con repetición) & $346.439 \times 1.024 \times 15$ & ~5.321M tokens \\ \hline
 \end{tabularx}
-\caption{Estadísticas reales del dataset (verificadas sobre archivos Arrow y código fuente). Las primeras 46.439 muestras se usaron para entrenamiento; las últimas 300.000 se reservaron para el benchmark. Con 713M tokens de entrenamiento y modelo de 167M parámetros, la relación tokens/parámetros es ~4,27:1 --- 4,7 veces por debajo del óptimo de Chinchilla (20:1).}
+\caption{Estadísticas reales del dataset (verificadas sobre archivos Arrow y código fuente del \textit{trainer}). El pipeline de entrenamiento no realiza ninguna partición train/val: el 100\% de las 346.439 muestras se usa en cada una de las 15 épocas. El corpus tiene ~354,8M tokens únicos; al repetirse 15 veces se procesan ~5.321M tokens en total, pero la magnitud relevante para las leyes de escala es la de tokens \textbf{únicos}, no la de tokens procesados con repetición.}
 \end{table}
 
-El ratio de 4,27:1 está 4,7 veces por debajo del óptimo prescrito por las leyes de Chinchilla~\cite{hoffmann2022chinchilla} para un modelo de 167M de parámetros (20:1, equivalente a 3.340M tokens). La limitación es presupuestaria y temporal: alcanzar ese volumen habría requerido aproximadamente 4,7 veces más entrenamiento en la \texttt{g7e.2xlarge}, con un sobrecoste de $\approx$\$449 adicionales en GPU (~127h de cómputo extra). La estrategia de curación --- mezcla de cuatro datasets cualitativamente diversos --- maximiza la utilidad de los tokens disponibles, pero no puede compensar un déficit de escala de este orden. Las consecuencias sobre la calidad generativa se analizan en el Capítulo~\ref{sec:conclusiones}.
+Aplicando las leyes de Chinchilla~\cite{hoffmann2022chinchilla} sobre la cifra que realmente importa --- los \textbf{354,8M de tokens únicos} del corpus, no los 5.321M procesados con repetición --- la relación tokens/parámetros es de ~2,1:1, frente al óptimo de 20:1 para un modelo de 167M de parámetros (equivalente a 3.340M de tokens únicos). Esto sitúa el proyecto \textbf{~9,4 veces por debajo} del volumen de datos único recomendado, una brecha mayor de la que se obtendría contando ingenuamente los tokens con repetición (que darían, incorrectamente, un ratio de ~31,9:1, por encima del óptimo). Repetir 15 veces el mismo corpus reducido no sustituye a la diversidad de datos nuevos que las leyes de escala presuponen: multiplica el coste de cómputo sin aportar información nueva al modelo, lo que favorece la memorización de patrones superficiales de tokens sobre el desarrollo de capacidades generativas genuinas.
+
+Esta limitación no es estrictamente presupuestaria: el pipeline que generó el dataset de entrenamiento del checkpoint evaluado recortaba cada fuente a una cuota fija sin compensar el déficit de las más pequeñas, imponiendo un techo de 346.439 muestras con independencia del presupuesto de cómputo disponible. Adicionalmente, al no reservarse ningún subconjunto para validación, las métricas cuantitativas reportadas en el Capítulo~\ref{sec:evaluacion} (PPL=2,98, Top-1=79,75\%) se midieron sobre datos vistos repetidamente durante el entrenamiento, por lo que reflejan ajuste al corpus de entrenamiento más que capacidad de generalización real. Las consecuencias sobre la calidad generativa se analizan en el Capítulo~\ref{sec:conclusiones}.
+
+\paragraph{Techo real de las cuatro fuentes.} Como se describe en la Sección~\ref{subsec:mezcla_elastica}, el rediseño del pipeline con asignación elástica hacia UltraChat eleva el dataset disponible de 346.439 a 494.876 muestras sin incorporar ninguna fuente nueva. El techo verdadero de las cuatro fuentes actuales, si se agotaran por completo (84.437 OpenAssistant + 52.002 Alpaca + 76.920 ShareGPT + 1.468.352 UltraChat), es de \textbf{1.681.711 muestras} ($\approx$1,72 mil millones de tokens únicos) --- un déficit de solo $\approx$1,9$\times$ frente a los 3.340M de tokens únicos de Chinchilla, notablemente menor que el $\approx$9,4$\times$ que resulta de los 346.439 muestras efectivamente usadas para entrenar el checkpoint evaluado en este trabajo. Esto no invalida la conclusión de que la disponibilidad de datos es la restricción activa (incluso agotando por completo las cuatro fuentes seguiría faltando volumen para el óptimo de Chinchilla), pero sí matiza su magnitud: gran parte de la brecha reportada en este TFM (9,4$\times$) proviene de una asignación de cuotas subóptima en el pipeline original, no únicamente del agotamiento intrínseco de las fuentes públicas disponibles. Alcanzar los 3.340M de tokens únicos que prescribe Chinchilla en su totalidad sí habría requerido incorporar fuentes de datos adicionales más allá de las cuatro utilizadas. Una candidata concreta y ya identificada en este trabajo es \textbf{The Stack} (Sección~\ref{subsec:the_stack}): su subconjunto Python (~50GB) por sí solo excede en varios órdenes de magnitud el déficit de $\approx$1,66 mil millones de tokens únicos restante hasta el óptimo de Chinchilla, incluso agotando las cuatro fuentes actuales. Su exclusión de este TFM no se debió a que el volumen de datos necesario no existiera, sino a la fricción operacional de un dataset \textit{gated} (aprobación manual en Hugging Face) incompatible con el requisito de reproducibilidad inmediata del proyecto --- es decir, la restricción de disponibilidad de datos discutida en esta sección es específica al conjunto de fuentes efectivamente integradas en el pipeline, no una limitación intrínseca de los datos abiertos disponibles en general.
 
 \subsection{Validación de Cobertura y Diversidad}
 
