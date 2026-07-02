@@ -1,13 +1,13 @@
 \section{Evaluación y Benchmarking}
 \label{sec:evaluacion}
 
-La evaluación rigurosa de un modelo de lenguaje requiere ir más allá de la observación de la curva de pérdida durante el entrenamiento. Este capítulo documenta primero la convergencia observada a lo largo del entrenamiento completo y, a continuación, la evaluación cuantitativa del modelo híbrido tfm-slm mediante un benchmark exhaustivo de 10 métricas ejecutado sobre un conjunto de validación independiente.
+La evaluación rigurosa de un modelo de lenguaje requiere ir más allá de la observación de la curva de pérdida durante el entrenamiento. Este capítulo documenta primero la convergencia observada a lo largo del entrenamiento completo y, a continuación, la evaluación cuantitativa del modelo híbrido tfm-slm mediante un benchmark exhaustivo de 10 métricas. Como se detalla en la Sección~\ref{subsec:benchmark_setup}, el pipeline de entrenamiento no reservó ningún subconjunto como holdout real: las métricas cuantitativas originales se midieron sobre datos ya vistos por el modelo durante el entrenamiento. Tras corregir esta limitación metodológica en el pipeline de datos, el mismo checkpoint se reevaluó sobre una partición genuinamente disjunta (Sección~\ref{subsec:benchmark_corregido}); este capítulo presenta ambos resultados de forma explícita.
 
 % ---------------------------------------------------------------
 \subsection{Evolución del Loss Durante el Entrenamiento}
 \label{subsec:training_convergence}
 
-El entrenamiento completo se ejecutó en \textbf{15 épocas} sobre $\approx$713 millones de tokens (46.439 muestras $\times$ 1.024 tokens $\times$ 15 épocas), con batches de 64 muestras y acumulación de gradientes de 2 pasos (batch efectivo de 128). Al final de cada época se guardó un checkpoint local sincronizado a S3, lo que permitió reanudar el entrenamiento sin pérdida de progreso ante cualquier interrupción de la instancia.
+El entrenamiento completo se ejecutó en \textbf{15 épocas} sobre el 100\% de las 346.439 muestras del dataset consolidado (354,8M tokens únicos; $\approx$5.321M tokens procesados contando la repetición de las 15 épocas), con batches de 64 muestras y acumulación de gradientes de 2 pasos (batch efectivo de 128). Al final de cada época se guardó un checkpoint local sincronizado a S3, lo que permitió reanudar el entrenamiento sin pérdida de progreso ante cualquier interrupción de la instancia.
 
 \begin{table}[H]
 \centering
@@ -16,14 +16,14 @@ El entrenamiento completo se ejecutó en \textbf{15 épocas} sobre $\approx$713 
 \textbf{Época} & \textbf{Train Loss (media)} & \textbf{Observación} \\ \hline
 1 & 1,72 & Descenso rápido; el modelo aprende estructura básica de tokens y patrones de diálogo \\ \hline
 2--14 & Descenso progresivo & Consolidación semántica; curva se aplana gradualmente \\ \hline
-15 (final) & $\approx$1,3 & Refinamiento de distribución; sin señal de overfitting en val\_loss \\ \hline
-Benchmark (val) & 1,091 & Evaluación sobre 300.000 muestras en conjunto independiente \\ \hline
+15 (final) & $\approx$1,3 & Refinamiento de distribución sobre el corpus repetido \\ \hline
+Benchmark (val) & 1,091 & Evaluación sobre 300.000 muestras del mismo dataset, no excluidas del entrenamiento (ver Sección~\ref{subsec:benchmark_setup}) \\ \hline
 \end{tabularx}
 \caption{Evolución de la pérdida media por época durante el entrenamiento.}
 \label{tab:training_loss}
 \end{table}
 
-La convergencia fue estable en todas las épocas: el ratio GRU/Attn se mantuvo en el rango \texttt{WELL BALANCED} (0,5--1,5) confirmando que ambos componentes contribuyeron al aprendizaje sin que ninguno dominara. La ausencia de divergencia entre training loss y val\_loss indica que el modelo no incurrió en overfitting severo; el déficit de datos respecto al óptimo de Chinchilla (4,7$\times$ menos tokens) mantuvo el entrenamiento en régimen de \textit{underfitting} moderado durante las quince épocas, que es la causa principal de las limitaciones en generación libre descritas en el Capítulo~\ref{sec:conclusiones}.
+La convergencia fue estable en todas las épocas: el ratio GRU/Attn se mantuvo en el rango \texttt{WELL BALANCED} (0,5--1,5) confirmando que ambos componentes contribuyeron al aprendizaje sin que ninguno dominara. La ausencia de divergencia entre el \textit{training loss} y el \textit{val\_loss} registrado durante el entrenamiento \textbf{no es evidencia de ausencia de overfitting}: como se detalla en la Sección~\ref{subsec:benchmark_setup}, el pipeline no reservó ningún holdout real, por lo que el \textit{val\_loss} se calculó sobre datos ya vistos por el modelo, lo que garantiza trivialmente la ausencia de divergencia. El déficit de datos únicos respecto al óptimo de Chinchilla ($\approx$9,4$\times$ menos tokens únicos que los 3.340M recomendados) mantuvo el entrenamiento en un régimen de \textit{underfitting} respecto a la diversidad de información nueva, pese a las quince pasadas sobre el mismo corpus; esta es la causa principal de las limitaciones en generación libre descritas en el Capítulo~\ref{sec:conclusiones}.
 
 % ---------------------------------------------------------------
 \subsection{Benchmarks Zero-Shot Comparables con SmolLM2}
@@ -65,14 +65,17 @@ Los resultados revelan que el tfm-slm opera \textbf{en el rango del azar} en los
     \item \textbf{PIQA (56,64\%)}: el único benchmark con señal genuina (+6,64 pp sobre el azar binario). Las tareas de conocimiento físico básico («¿cómo se limpia una sartén?») se benefician de haber entrenado sobre corpus de diálogo instrucción-respuesta, que frecuentemente contiene este tipo de razonamiento procedimental.
 \end{itemize}
 
-El gap respecto a SmolLM2-135M oscila entre 15 y 17 puntos porcentuales en HellaSwag y ARC, y 12 puntos en PIQA. Esta brecha es demasiado amplia para atribuirla a diferencias metodológicas menores entre implementaciones del harness; refleja directamente la diferencia en volumen de entrenamiento (713M tokens frente a 2T), que es el factor determinante para el desarrollo de capacidades emergentes de razonamiento.
+El gap respecto a SmolLM2-135M oscila entre 15 y 17 puntos porcentuales en HellaSwag y ARC, y 12 puntos en PIQA. Esta brecha es demasiado amplia para atribuirla a diferencias metodológicas menores entre implementaciones del harness; refleja directamente la diferencia en volumen de datos \textbf{únicos} de entrenamiento (354,8M tokens frente a 2T), que es el factor determinante para el desarrollo de capacidades emergentes de razonamiento.
 
 % ---------------------------------------------------------------
 \subsection{Entorno y Configuración del Benchmark}
+\label{subsec:benchmark_setup}
 
 La evaluación se ejecuta sobre la instancia \texttt{g7e.2xlarge} equipada con una GPU \textbf{NVIDIA RTX PRO 6000 Server} (96 GB VRAM), el mismo hardware utilizado para el entrenamiento final. A lo largo del proyecto se emplearon tres generaciones de hardware de forma progresiva: la NVIDIA L4 (24 GB, instancia \texttt{g6.2xlarge}) en las fases iniciales de experimentación con un pico de uso de $\approx$20 GB; la NVIDIA L40S (48 GB, instancia \texttt{g6e.2xlarge}) en fases intermedias con un pico de $\approx$40 GB; y la RTX PRO 6000 (96 GB, instancia \texttt{g7e.2xlarge}) para el entrenamiento y benchmarking final, con un pico de 66,76 GB sobre los 300.000 samples con batch 64. Esta progresión garantiza que las métricas de latencia y throughput son representativas del entorno operacional real.
 
-El checkpoint evaluado corresponde al modelo final almacenado en S3 (\texttt{s3://tfm-slm-benchmarks/benchmark\_hybrid.json}), descargado automáticamente por el sistema de benchmarking. El conjunto de validación, igualmente descargado desde S3, consiste en \textbf{300.000 muestras} del dataset mixto de diálogos e instrucciones, procesadas en lotes de 64 tokens, lo que resulta en 4.688 iteraciones de evaluación.
+El checkpoint evaluado corresponde al modelo final almacenado en S3 (\texttt{s3://tfm-slm-benchmarks/benchmark\_hybrid.json}), descargado automáticamente por el sistema de benchmarking. El conjunto usado en esta evaluación cuantitativa, igualmente descargado desde S3, consiste en \textbf{300.000 muestras} del dataset mixto de diálogos e instrucciones, procesadas en lotes de 64 tokens, lo que resulta en 4.688 iteraciones de evaluación.
+
+\paragraph{Construcción del conjunto de validación: limitación metodológica.} A diferencia de lo que exigiría una evaluación rigurosa, este conjunto de 300.000 muestras \textbf{no es un holdout real}. La revisión del código de entrenamiento (\texttt{app/training/trainer.py}) confirma que el bucle de entrenamiento itera sobre el 100\% de las 346.439 muestras del archivo Arrow consolidado descrito en el Capítulo~\ref{sec:datasets} (mezcla OASST 30\% / UltraChat 30\% / Alpaca 20\% / ShareGPT 20\%) en cada una de las 15 épocas, sin excluir ningún subconjunto. Las 300.000 muestras evaluadas aquí --- seleccionadas por posición dentro del mismo archivo --- fueron por tanto vistas repetidamente por el modelo durante el entrenamiento. En consecuencia, tanto el \textit{val\_loss} de la Tabla~\ref{tab:training_loss} como las métricas de PPL y Top-1 accuracy reportadas en este capítulo reflejan en buena medida la capacidad del modelo para memorizar el corpus de entrenamiento, no su capacidad de generalizar a datos no vistos. Esta limitación, detectada durante la revisión de este trabajo, se documenta aquí de forma explícita en lugar de corregirse retroactivamente los resultados ya obtenidos; las implicaciones se discuten en el Capítulo~\ref{sec:conclusiones}, junto con la corrección aplicada al pipeline (partición real train/validation en \texttt{app/dataset/processor.py}) de cara a futuras iteraciones del proyecto.
 
 \begin{table}[H]
 \centering
@@ -81,14 +84,43 @@ El checkpoint evaluado corresponde al modelo final almacenado en S3 (\texttt{s3:
 \textbf{Parámetro} & \textbf{Valor} \\ \hline
 Modelo evaluado & HybridBlock (12 capas, 768 oculto, 12 cabezas) \\ \hline
 Dispositivo & CUDA (NVIDIA RTX PRO 6000 Server, 96 GB VRAM) \\ \hline
-Muestras de validación & 300.000 \\ \hline
+Muestras evaluadas (no excluidas del entrenamiento) & 300.000 \\ \hline
 Tamaño de lote & 64 \\ \hline
 Iteraciones totales & 4.688 \\ \hline
 Tiempo total de evaluación & 3.399,88 s ($\approx$56 min) \\ \hline
 \end{tabularx}
-\caption{Configuración del entorno de benchmarking.}
+\caption{Configuración del entorno de benchmarking (evaluación original, con solape train/eval).}
 \label{tab:benchmark_config}
 \end{table}
+
+% ---------------------------------------------------------------
+\subsection{Corrección Metodológica: Reevaluación en Split Disjunto}
+\label{subsec:benchmark_corregido}
+
+Como se documenta en la Sección~\ref{subsec:estrategia_mezcla} del Capítulo~\ref{sec:datasets}, el pipeline de datos (\texttt{app/dataset/processor.py}) fue rediseñado para construir un conjunto genuinamente disjunto: en lugar de recortar cada fuente a una cuota fija --- lo que dejaba el total corto por el tamaño limitado de Alpaca (52.002 ejemplos) y ShareGPT (76.920 ejemplos) ---, UltraChat se trata como fuente \textit{elástica} que absorbe el déficit de las demás, garantizando siempre el total objetivo. El resultado es un dataset de \textbf{494.876 muestras} divididas mediante \texttt{train\_test\_split(seed=42)} en \textbf{346.439 de entrenamiento} y \textbf{148.437 de benchmark}, estas últimas nunca vistas por el checkpoint durante el entrenamiento.
+
+El mismo checkpoint (\texttt{.output/checkpoint.pt}, entrenado antes de esta corrección) se reevaluó sobre las 148.437 muestras de benchmark en la misma instancia \texttt{g7e.2xlarge} (CUDA, RTX PRO 6000), en 2.320 iteraciones con batch 64. Los resultados, guardados en \texttt{.output/benchmark\_hybrid.json} y sincronizados a S3, se resumen en la Tabla~\ref{tab:benchmark_corregido}.
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{|l|c|c|X|}
+\hline
+\textbf{Métrica} & \textbf{Original (solape)} & \textbf{Corregido (disjunto)} & \textbf{Observación} \\ \hline
+Muestras evaluadas & 300.000 & 148.437 & Split genuinamente disjunto en la versión corregida \\ \hline
+Loss (cross-entropy) & 1,091 & 1,601 & \\ \hline
+Perplejidad & 2,98 & 4,96 & \\ \hline
+Top-1 Accuracy & 79,75\% & 68,25\% & \\ \hline
+Top-5 Accuracy & 91,14\% & 82,65\% & \\ \hline
+Top-10 Accuracy & 93,56\% & 86,82\% & \\ \hline
+Throughput (batch) & 90.268 tok/s & 90.267 tok/s & Prácticamente idéntico: mismo hardware y batch size \\ \hline
+Memoria pico & 66,76 GB & 66,76 GB & \\ \hline
+Tiempo total & 3.399,88 s & 1.682,24 s & Menor por tener menos muestras (148.437 vs 300.000) \\ \hline
+\end{tabularx}
+\caption{Comparación entre el benchmark original (con solape train/eval) y el benchmark corregido (split disjunto de 148.437 muestras, nunca vistas durante el entrenamiento).}
+\label{tab:benchmark_corregido}
+\end{table}
+
+La caída de perplejidad (2,98 $\to$ 4,96) y de Top-1 accuracy (79,75\% $\to$ 68,25\%) al eliminar el solape confirma la sospecha planteada en la Sección~\ref{subsec:benchmark_setup}: una parte sustancial del resultado original reflejaba memorización, no generalización. Dicho esto, un 68,25\% de Top-1 accuracy sobre datos genuinamente no vistos \textbf{no es un resultado trivial} para un modelo de 167M de parámetros entrenado con un déficit de $\approx$9,4$\times$ respecto al óptimo de Chinchilla: indica que el modelo desarrolló capacidad de generalización real, aunque notablemente menor que la sugerida por la evaluación original. El throughput y la memoria pico, al depender del hardware y el batch size y no del contenido de los datos, permanecen prácticamente idénticos entre ambas evaluaciones, lo que corrobora que la diferencia observada es atribuible al solape train/eval y no a un cambio en las condiciones de medición.
 
 % ---------------------------------------------------------------
 \subsection{Métricas de Evaluación}
@@ -133,7 +165,7 @@ Top-10 Accuracy & 93,56\% & El token correcto está entre las 10 primeras predic
 
 Una precisión Top-1 del 79,75\% sobre 300.000 muestras es un resultado cuantitativamente sólido para un modelo entrenado desde cero con 167M de parámetros. La diferencia de 11,39 puntos porcentuales entre Top-1 y Top-5 refleja la naturaleza inherentemente ambigua del lenguaje natural: en muchos contextos, múltiples tokens son igualmente válidos como continuación, y el modelo los sitúa correctamente entre sus candidatos principales.
 
-No obstante, estas métricas deben interpretarse con cautela. Las leyes de escala de Chinchilla~\cite{hoffmann2022chinchilla} establecen que un modelo de 167M de parámetros requiere aproximadamente \textbf{3.340 millones de tokens} para alcanzar capacidades generativas óptimas. Este proyecto procesó $\approx$\textbf{713 millones de tokens} de entrenamiento (46.439 muestras $\times$ 1.024 tokens $\times$ 15 épocas; las 300.000 muestras restantes del dataset se reservaron para esta evaluación) --- 4,7 veces menos del volumen óptimo (ratio 4,27:1 frente al 20:1 de Chinchilla). Una alta precisión de predicción sobre datos en distribución no garantiza coherencia en generación libre, ya que en inferencia autoregresiva los errores se propagan: un token mal predicho condiciona todos los siguientes. El análisis cualitativo completo se recoge en el Capítulo~\ref{sec:conclusiones}.
+No obstante, estas métricas deben interpretarse con cautela, y no solo por el solape train/eval de la evaluación original (Sección~\ref{subsec:benchmark_corregido}). Las leyes de escala de Chinchilla~\cite{hoffmann2022chinchilla} establecen que un modelo de 167M de parámetros requiere aproximadamente \textbf{3.340 millones de tokens únicos} para alcanzar capacidades generativas óptimas. Este proyecto entrenó sobre $\approx$\textbf{354,8 millones de tokens únicos} (346.439 muestras $\times$ 1.024 tokens), acumulando $\approx$5.321 millones de tokens procesados al repetir el corpus 15 épocas --- $\approx$9,4 veces menos tokens únicos que el óptimo (ratio $\approx$2,1:1 frente al 20:1 de Chinchilla). Una alta precisión de predicción sobre datos en distribución no garantiza coherencia en generación libre, ya que en inferencia autoregresiva los errores se propagan: un token mal predicho condiciona todos los siguientes. El análisis cualitativo completo se recoge en el Capítulo~\ref{sec:conclusiones}.
 
 \subsubsection{Eficiencia Computacional}
 
@@ -173,14 +205,14 @@ El modelo más próximo al tfm-slm en tamaño es \textbf{SmolLM2}~\cite{allal202
 \hline
 \textbf{Modelo} & \textbf{Params} & \textbf{Tokens} & \textbf{Arquitectura} & \textbf{Tamaño} \\ \hline
 SmolLM2-135M & 135M & 2T & Transformer & 723 MB \\ \hline
-\textbf{tfm-slm (este TFM)} & \textbf{167M} & \textbf{0,71T} & \textbf{GRU+Attn} & \textbf{637 MB} \\ \hline
+\textbf{tfm-slm (este TFM)} & \textbf{167M} & \textbf{354,8M$^{u}$} & \textbf{GRU+Attn} & \textbf{637 MB} \\ \hline
 SmolLM2-360M & 360M & 4T & Transformer & $\approx$1,4 GB \\ \hline
 \end{tabularx}
-\caption{Comparativa estructural entre tfm-slm y SmolLM2. Los tokens del tfm-slm incluyen las 15 épocas sobre 46.439 muestras.}
+\caption{Comparativa estructural entre tfm-slm y SmolLM2. $^{u}$Tokens \textbf{únicos} del tfm-slm (346.439 muestras $\times$ 1.024 tokens, una pasada); al repetir el corpus 15 épocas se procesan $\approx$5.321M tokens, pero la magnitud comparable a los totales de SmolLM2 (datos genuinamente distintos, sin repetición) es la de tokens únicos.}
 \label{tab:comparativa_modelos}
 \end{table}
 
-Los resultados de los benchmarks zero-shot (Sección~\ref{subsec:lmeval}) muestran una brecha de 15--17 puntos en HellaSwag y ARC, y 12 en PIQA. SmolLM2-135M se entrenó con 2T tokens --- casi $3\times$ el óptimo de Chinchilla para ese tamaño. El tfm-slm utilizó 713M (el 21\% del mínimo recomendado), insuficiente para el desarrollo de capacidades generativas emergentes. La arquitectura GRU+Attn es estructuralmente más expresiva por capa, pero no puede compensar el sub\-en\-tren\-a\-mien\-to: el trabajo futuro prioritario es \textbf{ampliar el corpus}, no rediseñar la arquitectura.
+Los resultados de los benchmarks zero-shot (Sección~\ref{subsec:lmeval}) muestran una brecha de 15--17 puntos en HellaSwag y ARC, y 12 en PIQA. SmolLM2-135M se entrenó con 2T tokens --- casi $3\times$ el óptimo de Chinchilla para ese tamaño. El tfm-slm dispuso de $\approx$354,8M tokens únicos ($\approx$10,6\% del mínimo recomendado por Chinchilla, $\approx$9,4$\times$ por debajo), insuficiente para el desarrollo de capacidades generativas emergentes. La arquitectura GRU+Attn es estructuralmente más expresiva por capa, pero no puede compensar el sub\-en\-tren\-a\-mien\-to: el trabajo futuro prioritario es \textbf{ampliar el corpus}, no rediseñar la arquitectura.
 
 % ---------------------------------------------------------------
 \subsection{Evaluación Cualitativa: Generación Libre}
@@ -218,7 +250,7 @@ Con temperatura 0,7, el prompt en inglés \textbf{``Write a short poem about the
     \item \textbf{``Continue this story: Once upon a time, in a distant land,''}: \textit{``Now, please, to explain it. [Your Name].''} Ignora por completo el contexto narrativo.
 \end{itemize}
 
-Estos fallos son cualitativamente distintos de los errores de un modelo suficientemente entrenado: no son errores de conocimiento sino de \textbf{coherencia generativa}. Un modelo correctamente entrenado puede equivocarse en una pregunta, pero no entra en bucles de repetición ni confunde su propio rol con el del usuario. La taxonomía de fallos confirma que 713M de tokens son insuficientes para estabilizar las estructuras atencionales y recurrentes necesarias para la generación coherente de lenguaje.
+Estos fallos son cualitativamente distintos de los errores de un modelo suficientemente entrenado: no son errores de conocimiento sino de \textbf{coherencia generativa}. Un modelo correctamente entrenado puede equivocarse en una pregunta, pero no entra en bucles de repetición ni confunde su propio rol con el del usuario. La taxonomía de fallos confirma que $\approx$354,8M de tokens únicos son insuficientes para estabilizar las estructuras atencionales y recurrentes necesarias para la generación coherente de lenguaje.
 
 % ---------------------------------------------------------------
 \subsection{Resumen de Resultados}
@@ -227,23 +259,23 @@ Estos fallos son cualitativamente distintos de los errores de un modelo suficien
 \centering
 \begin{tabularx}{\textwidth}{|l|c|X|}
 \hline
-\textbf{Métrica} & \textbf{Resultado} & \textbf{Categoría} \\ \hline
-Loss (cross-entropy) & 1,091 & Calidad \\ \hline
-Perplejidad & 2,98 & Calidad \\ \hline
-Top-1 Accuracy & 79,75\% & Calidad \\ \hline
-Top-5 Accuracy & 91,14\% & Calidad \\ \hline
-Top-10 Accuracy & 93,56\% & Calidad \\ \hline
-Latencia por token & 7,00 ms & Eficiencia \\ \hline
-Throughput (single token) & 142,76 tok/s & Eficiencia \\ \hline
-Throughput (batch, GPU pura) & $\approx$146.000 tok/s & Eficiencia \\ \hline
-Throughput (batch, despliegue completo) & 90.268 tok/s & Eficiencia \\ \hline
-Parámetros totales & 166.980.864 & Recursos \\ \hline
-Tamaño del modelo & 636,98 MB & Recursos \\ \hline
+\textbf{Métrica} & \textbf{Original (solape)} & \textbf{Corregido (disjunto)} & \textbf{Categoría} \\ \hline
+Loss (cross-entropy) & 1,091 & 1,601 & Calidad \\ \hline
+Perplejidad & 2,98 & 4,96 & Calidad \\ \hline
+Top-1 Accuracy & 79,75\% & 68,25\% & Calidad \\ \hline
+Top-5 Accuracy & 91,14\% & 82,65\% & Calidad \\ \hline
+Top-10 Accuracy & 93,56\% & 86,82\% & Calidad \\ \hline
+Latencia por token & 7,00 ms & 7,00 ms & Eficiencia \\ \hline
+Throughput (single token) & 142,76 tok/s & 142,78 tok/s & Eficiencia \\ \hline
+Throughput (batch, GPU pura) & $\approx$146.000 tok/s & $\approx$146.200 tok/s & Eficiencia \\ \hline
+Throughput (batch, despliegue completo) & 90.268 tok/s & 90.267 tok/s & Eficiencia \\ \hline
+Parámetros totales & \multicolumn{2}{c|}{166.980.864} & Recursos \\ \hline
+Tamaño del modelo & \multicolumn{2}{c|}{636,98 MB} & Recursos \\ \hline
 \end{tabularx}
-\caption{Resumen de las 10 métricas del benchmark del modelo híbrido tfm-slm.}
+\caption{Resumen de las 10 métricas del benchmark del modelo híbrido tfm-slm: evaluación original (300.000 muestras con solape train/eval) frente a la evaluación corregida (148.437 muestras del split disjunto, ver Sección~\ref{subsec:benchmark_corregido}).}
 \label{tab:benchmark_summary}
 \end{table}
 
-Los resultados cuantitativos son sólidos: una perplejidad de 2,98 y una precisión Top-1 del 79,75\% sobre 300.000 muestras son cifras competitivas para un modelo de 167M de parámetros entrenado desde cero. Sin embargo, estas métricas miden capacidad predictiva \textit{en distribución} ---sobre datos extraídos de la misma mezcla de entrenamiento---, no calidad de generación libre.
+Los resultados cuantitativos originales eran sólidos en apariencia: una perplejidad de 2,98 y una precisión Top-1 del 79,75\% sobre 300.000 muestras. Sin embargo, esas métricas medían capacidad predictiva sobre datos ya vistos durante el entrenamiento. La reevaluación sobre el split disjunto de 148.437 muestras (perplejidad 4,96, Top-1 68,25\%) ofrece una medida honesta de generalización: sigue siendo un resultado no trivial para un modelo de 167M de parámetros con el déficit de datos descrito a continuación, pero notablemente inferior al sugerido por la evaluación original.
 
-Como se documenta en el Capítulo~\ref{sec:conclusiones}, la evaluación cualitativa mediante inferencia real revela un cuadro distinto: el modelo produce bucles de repetición, incoherencia semántica y mezcla de idiomas de forma sistemática. La causa no es arquitectónica sino de escala de datos: con 713 millones de tokens de entrenamiento frente a los 3.340 millones que prescriben las leyes de Chinchilla~\cite{hoffmann2022chinchilla} para un modelo de este tamaño (ratio 4,27:1 frente al óptimo de 20:1, 4,7 veces menos), las capacidades generativas emergentes no se desarrollan. Las métricas del benchmark son necesarias pero no suficientes para evaluar la utilidad real de un modelo de lenguaje.
+Como se documenta en el Capítulo~\ref{sec:conclusiones}, la evaluación cualitativa mediante inferencia real revela un cuadro consistente con esta caída: el modelo produce bucles de repetición, incoherencia semántica y mezcla de idiomas de forma sistemática. La causa no es arquitectónica sino de escala de datos: con $\approx$354,8 millones de tokens únicos de entrenamiento frente a los 3.340 millones que prescriben las leyes de Chinchilla~\cite{hoffmann2022chinchilla} para un modelo de este tamaño ($\approx$9,4 veces menos que el óptimo), las capacidades generativas emergentes no se desarrollan. Las métricas del benchmark, en cualquiera de sus dos versiones, son necesarias pero no suficientes para evaluar la utilidad real de un modelo de lenguaje.
