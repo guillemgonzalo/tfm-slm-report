@@ -229,13 +229,13 @@ La familia SmolLM2~\cite{allal2025smollm2}, publicada por Hugging Face en 2025, 
 SmolLM2-135M~\cite{allal2025smollm2} & 135M & $\sim$2T & 8.192 & Transformer decoder \\ \hline
 Phi-3-mini~\cite{abdin2024phi3} & 3,8B & 3,3T & 4.096 / 128K & Transformer decoder \\ \hline
 Mistral-7B~\cite{jiang2023mistral} & 7B & $>$1T & 32K & Transformer + GQA \\ \hline
-\textbf{TFM-SLM (este trabajo)} & \textbf{167M} & \textbf{713M} & \textbf{1.024} & \textbf{Híbrido Transformer-GRU} \\ \hline
+1\textbf{TFM-SLM (este trabajo)} & \textbf{167M} & \textbf{354,8M}$^*$ & \textbf{1.024} & \textbf{Híbrido Transformer-GRU} \\ \hline
 \end{tabular}
-\caption{Comparativa de modelos de lenguaje de referencia. La diferencia en tokens de entrenamiento es el factor determinante para las capacidades generativas emergentes.}
+\caption{Comparativa de modelos de lenguaje de referencia. La diferencia en tokens de entrenamiento es el factor determinante para las capacidades generativas emergentes. $^*$Tokens \textbf{únicos} del corpus del TFM (346.439 muestras $\times$ 1.024 tokens); el modelo procesó este corpus 15 veces (repetición de épocas), acumulando $\approx$5.321M de tokens vistos en total, cifra no comparable a los tokens únicos de los demás modelos de la tabla.}
 \label{tab:slm_comparison}
 \end{table}
 
-La diferencia de tres órdenes de magnitud entre SmolLM2-135M ($\sim$2T tokens) y este TFM (713M tokens) explica la brecha cualitativa en generación libre, independientemente de las diferencias arquitectónicas. Las leyes de Chinchilla prescriben 3.340M de tokens para un modelo de 167M de parámetros; SmolLM2-135M supera ese umbral en un factor 600.
+La diferencia de tres órdenes de magnitud entre SmolLM2-135M ($\sim$2T tokens únicos) y este TFM (354,8M tokens únicos) explica la brecha cualitativa en generación libre, independientemente de las diferencias arquitectónicas. Las leyes de Chinchilla prescriben 3.340M de tokens únicos para un modelo de 167M de parámetros; SmolLM2-135M supera ese umbral en un factor 600, mientras que este TFM se queda $\approx$9,4 veces por debajo.
 
 % ---------------------------------------------------------------
 \subsection{Tokenización: El Puente entre Texto y Modelo}
