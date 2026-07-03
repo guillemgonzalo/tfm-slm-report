@@ -160,7 +160,7 @@ Los pesos nominales de la Tabla anterior asumen que cada fuente puede aportar su
 
 \begin{table}[H]
 \centering
-\begin{tabularx}{\textwidth}{|l|c|c|}
+\begin{tabularx}{\textwidth}{|X|c|c|}
 \hline
 \textbf{Fuente} & \textbf{Cuota pedida (peso)} & \textbf{Tamaño real disponible} \\ \hline
 OpenAssistant & $\approx$148.463 & 84.437 \\ \hline
@@ -236,7 +236,7 @@ tokenized_ds.save_to_disk(".datasets/mixed_dataset")
 
 \subsection{Estadísticas Finales de Entrenamiento}
 
-Con la mezcla y ponderación descritas, el dataset consolidado tiene las siguientes características:
+Esta sección describe el dataset y el pipeline \textbf{tal como se usaron para producir el checkpoint evaluado en este TFM} --- es decir, antes de la corrección metodológica de la Sección~\ref{subsec:mezcla_elastica}. Con la mezcla y ponderación descritas, el dataset consolidado de ese entrenamiento tiene las siguientes características:
 
 \begin{table}[H]
 \centering
@@ -245,7 +245,7 @@ Con la mezcla y ponderación descritas, el dataset consolidado tiene las siguien
 \textbf{Métrica} & \textbf{Descripción} & \textbf{Valor} \\ \hline
 Muestras totales en dataset Arrow & Verificado sobre archivos \texttt{.arrow} & 346.439 \\ \hline
 \quad — usadas en entrenamiento & El \textit{trainer} itera sobre el 100\% del dataset en cada época, sin partición train/val & 346.439 (100\%) \\ \hline
-\quad — reservadas para validación & Ninguna: no existe holdout real en el pipeline que generó los resultados de este TFM & 0 \\ \hline
+\quad — reservadas para validación & Ninguna en este entrenamiento: no existía holdout real en el pipeline que generó el checkpoint evaluado (corregido posteriormente, ver Sección~\ref{subsec:mezcla_elastica}) & 0 \\ \hline
 Tokens por Muestra & Longitud fija (padding/truncation) & 1.024 tokens \\ \hline
 Contexto Máximo & Longitud máxima procesada por modelo & 1.024 tokens \\ \hline
 Vocabulario & Tokens únicos (GPT-2 tokenizer) & 50.257 \\ \hline
@@ -253,7 +253,7 @@ Vocabulario & Tokens únicos (GPT-2 tokenizer) & 50.257 \\ \hline
 Tokens Únicos del Corpus & $346.439 \times 1.024$ (una pasada) & ~354,8M tokens \\ \hline
 Tokens Procesados (con repetición) & $346.439 \times 1.024 \times 15$ & ~5.321M tokens \\ \hline
 \end{tabularx}
-\caption{Estadísticas reales del dataset (verificadas sobre archivos Arrow y código fuente del \textit{trainer}). El pipeline de entrenamiento no realiza ninguna partición train/val: el 100\% de las 346.439 muestras se usa en cada una de las 15 épocas. El corpus tiene ~354,8M tokens únicos; al repetirse 15 veces se procesan ~5.321M tokens en total, pero la magnitud relevante para las leyes de escala es la de tokens \textbf{únicos}, no la de tokens procesados con repetición.}
+\caption{Estadísticas reales del dataset del entrenamiento evaluado (verificadas sobre archivos Arrow y código fuente del \textit{trainer}), previo a la corrección metodológica. Ese pipeline no realizaba ninguna partición train/val: el 100\% de las 346.439 muestras se usó en cada una de las 15 épocas. El corpus tiene ~354,8M tokens únicos; al repetirse 15 veces se procesan ~5.321M tokens en total, pero la magnitud relevante para las leyes de escala es la de tokens \textbf{únicos}, no la de tokens procesados con repetición. La Sección~\ref{subsec:mezcla_elastica} describe el pipeline rediseñado, que sí reserva un holdout genuino de 148.437 muestras.}
 \end{table}
 
 Aplicando las leyes de Chinchilla~\cite{hoffmann2022chinchilla} sobre la cifra que realmente importa --- los \textbf{354,8M de tokens únicos} del corpus, no los 5.321M procesados con repetición --- la relación tokens/parámetros es de ~2,1:1, frente al óptimo de 20:1 para un modelo de 167M de parámetros (equivalente a 3.340M de tokens únicos). Esto sitúa el proyecto \textbf{~9,4 veces por debajo} del volumen de datos único recomendado, una brecha mayor de la que se obtendría contando ingenuamente los tokens con repetición (que darían, incorrectamente, un ratio de ~31,9:1, por encima del óptimo). Repetir 15 veces el mismo corpus reducido no sustituye a la diversidad de datos nuevos que las leyes de escala presuponen: multiplica el coste de cómputo sin aportar información nueva al modelo, lo que favorece la memorización de patrones superficiales de tokens sobre el desarrollo de capacidades generativas genuinas.
