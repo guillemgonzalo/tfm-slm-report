@@ -94,7 +94,7 @@ h_t &= (1 - z_t) \odot h_{t-1} + z_t \odot \tilde{h}_t
     \label{fig:gru_cell_sota}
 \end{figure}
 
-Las GRUs logran un rendimiento comparable a LSTMs con \textbf{menos parámetros} ($\sim$33\% menos) y son más fáciles de entrenar. Ambas arquitecturas eliminan el problema de vanishing gradients al mantener conexiones aditivas directas en la ruta del gradiente, pero siguen siendo secuenciales: el tiempo de inferencia crece linealmente con la longitud de la secuencia.
+Las GRUs logran un rendimiento comparable a LSTMs con \textbf{menos parámetros} ($\sim$25\% menos) y son más fáciles de entrenar. Ambas arquitecturas eliminan el problema de vanishing gradients al mantener conexiones aditivas directas en la ruta del gradiente, pero siguen siendo secuenciales: el tiempo de inferencia crece linealmente con la longitud de la secuencia.
 
 % ---------------------------------------------------------------
 \subsection{El Mecanismo de Atención y el Nacimiento de los Transformers}
