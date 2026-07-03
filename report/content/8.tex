@@ -151,7 +151,7 @@ El desglose completo de costes del proyecto, incluyendo el coste de infraestruct
 
 \subsection{Mejoras Iterativas durante el Entrenamiento}
 
-A lo largo del proceso de entrenamiento se identificaron y corrigieron seis limitaciones de la arquitectura inicial mediante un ciclo de desarrollo iterativo: persistencia de estados ocultos GRU entre bloques, reposicionamiento del GRU antes de la atención (GRU → MHA → MLP), inicialización ortogonal de pesos recurrentes, gradient clipping con norma máxima 1.0, logging de contribución por componente y validación periódica contra un subconjunto no visto. El análisis detallado de cada mejora, incluyendo su justificación técnica e impacto cuantificado sobre la convergencia, se documenta en el Capítulo~\ref{sec:implementation}.
+A lo largo del proceso de entrenamiento se identificaron y corrigieron nueve limitaciones de la arquitectura inicial mediante un ciclo de desarrollo iterativo: persistencia de estados ocultos GRU entre bloques, reposicionamiento del GRU antes de la atención (GRU → MHA → MLP), inicialización ortogonal de pesos recurrentes, gradient clipping con norma máxima 1.0, logging de contribución por componente, validación periódica contra un subconjunto no visto, una herramienta de análisis arquitectónico (\texttt{HybridArchitectureAnalyzer}), una suite de tests automatizados y la integración de Flash Attention. El análisis detallado de cada mejora, incluyendo su justificación técnica e impacto cuantificado sobre la convergencia, se documenta en el Capítulo~\ref{sec:implementation}.
 
 \subsection{Evolución del Hardware: De G6 a G6e y G7e}
 
