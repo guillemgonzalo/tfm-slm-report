@@ -67,7 +67,7 @@ El proyecto ejecutó \textbf{tres entrenamientos completos}, cada uno sobre una 
 \hline
 \textbf{Especificación} & \textbf{NVIDIA L4} & \textbf{NVIDIA L40S} & \textbf{RTX PRO 6000} \\ \hline
 Instancia AWS & \texttt{g6.2xlarge} & \texttt{g6e.2xlarge} & \texttt{g7e.2xlarge} \\ \hline
-VRAM & 22 GB & 44 GB & 96 GB \\ \hline
+VRAM & 24 GB & 48 GB & 96 GB \\ \hline
 Tipo de memoria & GDDR6 & GDDR6 & \textbf{GDDR7} \\ \hline
 Bus de memoria & 192 bits & 384 bits & 512 bits \\ \hline
 Núcleos CUDA & 7.424 & 18.176 & 24.064 \\ \hline
@@ -81,7 +81,7 @@ Núcleos CUDA & 7.424 & 18.176 & 24.064 \\ \hline
 \begin{tabularx}{\textwidth}{|X|c|c|c|c|c|}
 \hline
 \textbf{Especificación} & \textbf{L4} & \textbf{$\Delta$ L4→L40S} & \textbf{L40S} & \textbf{$\Delta$ L40S→PRO} & \textbf{RTX PRO} \\ \hline
-VRAM             & 22 GB   & +100\%  & 44 GB   & +118\% & 96 GB   \\ \hline
+VRAM             & 24 GB   & +100\%  & 48 GB   & +100\% & 96 GB   \\ \hline
 Bus de memoria   & 192 bit & +100\%  & 384 bit & +33\%  & 512 bit \\ \hline
 Tipo de memoria  & GDDR6   & ---     & GDDR6   & ---    & \textbf{GDDR7}   \\ \hline
 Núcleos CUDA     & 7.424   & +145\%  & 18.176  & +32\%  & 24.064  \\ \hline
@@ -110,7 +110,7 @@ Núcleos CUDA     & 7.424   & +145\%  & 18.176  & +32\%  & 24.064  \\ \hline
 ]
 \addplot coordinates {(VRAM (GB),100) (Bus (bits),100) (CUDA cores (×100),100)};
 \addplot coordinates {(VRAM (GB),200) (Bus (bits),200) (CUDA cores (×100),245)};
-\addplot coordinates {(VRAM (GB),436) (Bus (bits),267) (CUDA cores (×100),324)};
+\addplot coordinates {(VRAM (GB),400) (Bus (bits),267) (CUDA cores (×100),324)};
 \legend{NVIDIA L4, NVIDIA L40S, RTX PRO 6000}
 \end{axis}
 \end{tikzpicture}
@@ -118,9 +118,9 @@ Núcleos CUDA     & 7.424   & +145\%  & 18.176  & +32\%  & 24.064  \\ \hline
 \label{fig:gpu_comparison}
 \end{figure}
 
-\paragraph{L4 → L40S.} El bus se duplica de 192 a \textbf{384 bits} y la VRAM de 22 a \textbf{44 GB}, eliminando los errores OOM con batch sizes mayores. Los núcleos CUDA pasan de 7.424 a \textbf{18.176} (+145\%), incrementando el paralelismo de cómputo de forma sustancial.
+\paragraph{L4 → L40S.} El bus se duplica de 192 a \textbf{384 bits} y la VRAM de 24 a \textbf{48 GB}, eliminando los errores OOM con batch sizes mayores. Los núcleos CUDA pasan de 7.424 a \textbf{18.176} (+145\%), incrementando el paralelismo de cómputo de forma sustancial.
 
-\paragraph{L40S → RTX PRO 6000.} La VRAM vuelve a incrementarse hasta \textbf{96 GB} (+118\%), el bus alcanza \textbf{512 bits} y la memoria migra de GDDR6 a \textbf{GDDR7}, con mayor ancho de banda por pin. Los \textbf{24.064 núcleos CUDA} suponen un +32\% sobre la L40S y un +224\% acumulado sobre la L4. Esta configuración permitió alcanzar picos de $\approx$90 GB durante el entrenamiento sin restricciones.
+\paragraph{L40S → RTX PRO 6000.} La VRAM vuelve a incrementarse hasta \textbf{96 GB} (+100\%), el bus alcanza \textbf{512 bits} y la memoria migra de GDDR6 a \textbf{GDDR7}, con mayor ancho de banda por pin. Los \textbf{24.064 núcleos CUDA} suponen un +32\% sobre la L40S y un +224\% acumulado sobre la L4. Esta configuración permitió alcanzar picos de $\approx$90 GB durante el entrenamiento sin restricciones.
 
 \subsubsection{Imágenes de Precios AWS (región \texttt{eu-south-2})}
 
@@ -157,6 +157,6 @@ A lo largo del proceso de entrenamiento se identificaron y corrigieron seis limi
 
 Las optimizaciones de software descritas en las secciones anteriores exprimieron al máximo los 24 GB de VRAM de la NVIDIA L4 (\texttt{g6.2xlarge}). A medida que el batch size objetivo aumentó y los requisitos de memoria superaron ese umbral, la progresión de hardware siguió dos saltos consecutivos:
 
-\paragraph{G6 → G6e (L4 → L40S).} Se migró a la instancia \texttt{g6e.2xlarge} equipada con la \textbf{NVIDIA L40S} (44 GB VRAM). El bus de memoria se duplica de 192 a 384 bits y la VRAM pasa de 22 a 44 GB, eliminando los errores OOM que aparecían con configuraciones de batch más agresivas. Esta instancia sirvió de paso intermedio para validar el pipeline completo con mayor holgura de memoria.
+\paragraph{G6 → G6e (L4 → L40S).} Se migró a la instancia \texttt{g6e.2xlarge} equipada con la \textbf{NVIDIA L40S} (48 GB VRAM). El bus de memoria se duplica de 192 a 384 bits y la VRAM pasa de 24 a 48 GB, eliminando los errores OOM que aparecían con configuraciones de batch más agresivas. Esta instancia sirvió de paso intermedio para validar el pipeline completo con mayor holgura de memoria.
 
-\paragraph{G6e → G7e (L40S → RTX PRO 6000).} Con el batch definitivo de 64 muestras (batch efectivo 128 con acumulación de 2), el pico de memoria durante el forward pass de evaluación alcanzó 66,76 GB, superando los 44 GB de la L40S. El entrenamiento completo (incluyendo gradientes y estados del optimizador) llegó a $\approx$90 GB, requiriendo la migración definitiva a la familia \textbf{G7e}, equipada con la \textbf{NVIDIA RTX PRO 6000 Server} (96 GB VRAM, bus 512 bits, memoria GDDR7). Ambas migraciones mantuvieron la misma arquitectura de despliegue basada en Terraform y Docker, sin cambios en el pipeline de entrenamiento.
+\paragraph{G6e → G7e (L40S → RTX PRO 6000).} Con el batch definitivo de 64 muestras (batch efectivo 128 con acumulación de 2), el pico de memoria durante el forward pass de evaluación alcanzó 66,76 GB, superando los 48 GB de la L40S. El entrenamiento completo (incluyendo gradientes y estados del optimizador) llegó a $\approx$90 GB, requiriendo la migración definitiva a la familia \textbf{G7e}, equipada con la \textbf{NVIDIA RTX PRO 6000 Server} (96 GB VRAM, bus 512 bits, memoria GDDR7). Ambas migraciones mantuvieron la misma arquitectura de despliegue basada en Terraform y Docker, sin cambios en el pipeline de entrenamiento.
