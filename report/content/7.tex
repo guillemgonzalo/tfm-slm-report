@@ -179,7 +179,7 @@ Esta discrepancia se explica por la diferencia de granularidad en la medición: 
 \subsubsection{Huella de Recursos}
 
 \paragraph{Tamaño del Modelo.}
-El modelo cuenta con \textbf{166.980.864 parámetros}, todos ellos entrenables, con un tamaño en disco de \textbf{636,98 MB}. Esto lo sitúa en la categoría de Small Language Model (SLM), equiparable en orden de magnitud a GPT-2 Medium (345M params) pero con una huella de memoria significativamente menor gracias a la arquitectura híbrida.
+El modelo cuenta con \textbf{166.980.864 parámetros}, todos ellos entrenables, con un tamaño de \textbf{636,98 MB} en precisión fp32 ($166.980.864 \times 4$ bytes) --- la cifra relevante para un despliegue de solo inferencia (pesos del modelo). Esto lo sitúa en la categoría de Small Language Model (SLM), equiparable en orden de magnitud a GPT-2 Medium (345M params) pero con una huella de memoria significativamente menor gracias a la arquitectura híbrida. El archivo \texttt{.output/checkpoint.pt} generado durante el entrenamiento ocupa, sin embargo, $\approx$1,9 GB en disco: además de los pesos del modelo, almacena el estado completo del optimizador Adam (dos tensores de momento por parámetro, $\approx$2$\times$ el tamaño del modelo) junto con el estado del \textit{scheduler}, la época y el \textit{global step} (Sección~\ref{sec:implementation}), necesarios para poder reanudar el entrenamiento pero irrelevantes en producción.
 
 \paragraph{Memoria en Pico.}
 El pico de memoria GPU durante la evaluación fue de \textbf{66,76 GB}, sobre los 96 GB disponibles en la NVIDIA RTX PRO 6000 Server. Este valor corresponde a 300.000 muestras con batch 64 en modo solo forward pass (sin gradientes), con activaciones intermedias acumuladas para el cómputo de métricas. Durante la inferencia en producción (un único token por paso con KV-cache, sin activaciones intermedias), el consumo desciende a $\approx$20 GB, compatible con la NVIDIA L4 empleada en fases anteriores del proyecto. El pico durante el entrenamiento completo se documenta en el Capítulo~\ref{sec:infraestructura}.
@@ -205,10 +205,10 @@ El modelo más próximo al tfm-slm en tamaño es \textbf{SmolLM2}~\cite{allal202
 \hline
 \textbf{Modelo} & \textbf{Params} & \textbf{Tokens} & \textbf{Arquitectura} & \textbf{Tamaño} \\ \hline
 SmolLM2-135M & 135M & 2T & Transformer & 723 MB \\ \hline
-\textbf{tfm-slm (este TFM)} & \textbf{167M} & \textbf{354,8M$^{u}$} & \textbf{GRU+Attn} & \textbf{637 MB} \\ \hline
+\textbf{tfm-slm (este TFM)} & \textbf{167M} & \textbf{354,8M$^{u}$} & \textbf{GRU+Attn} & \textbf{637 MB$^{w}$} \\ \hline
 SmolLM2-360M & 360M & 4T & Transformer & $\approx$1,4 GB \\ \hline
 \end{tabularx}
-\caption{Comparativa estructural entre tfm-slm y SmolLM2. $^{u}$Tokens \textbf{únicos} del tfm-slm (346.439 muestras $\times$ 1.024 tokens, una pasada); al repetir el corpus 15 épocas se procesan $\approx$5.321M tokens, pero la magnitud comparable a los totales de SmolLM2 (datos genuinamente distintos, sin repetición) es la de tokens únicos.}
+\caption{Comparativa estructural entre tfm-slm y SmolLM2. $^{u}$Tokens \textbf{únicos} del tfm-slm (346.439 muestras $\times$ 1.024 tokens, una pasada); al repetir el corpus 15 épocas se procesan $\approx$5.321M tokens, pero la magnitud comparable a los totales de SmolLM2 (datos genuinamente distintos, sin repetición) es la de tokens únicos. $^{w}$Tamaño de los \textbf{pesos del modelo} en fp32, comparable a los tamaños de despliegue publicados de SmolLM2; el archivo de \textit{checkpoint} de entrenamiento (\texttt{.output/checkpoint.pt}), que incluye además el estado del optimizador, ocupa $\approx$1,9 GB en disco.}
 \label{tab:comparativa_modelos}
 \end{table}
 
@@ -257,7 +257,7 @@ Estos fallos son cualitativamente distintos de los errores de un modelo suficien
 
 \begin{table}[H]
 \centering
-\begin{tabularx}{\textwidth}{|l|c|c|X|}
+\begin{tabularx}{\textwidth}{|X|c|c|c|}
 \hline
 \textbf{Métrica} & \textbf{Original (solape)} & \textbf{Corregido (disjunto)} & \textbf{Categoría} \\ \hline
 Loss (cross-entropy) & 1,091 & 1,601 & Calidad \\ \hline
@@ -270,9 +270,9 @@ Throughput (single token) & 142,76 tok/s & 142,78 tok/s & Eficiencia \\ \hline
 Throughput (batch, GPU pura) & $\approx$146.000 tok/s & $\approx$146.200 tok/s & Eficiencia \\ \hline
 Throughput (batch, despliegue completo) & 90.268 tok/s & 90.267 tok/s & Eficiencia \\ \hline
 Parámetros totales & \multicolumn{2}{c|}{166.980.864} & Recursos \\ \hline
-Tamaño del modelo & \multicolumn{2}{c|}{636,98 MB} & Recursos \\ \hline
+Tamaño del modelo$^{w}$ & \multicolumn{2}{c|}{636,98 MB} & Recursos \\ \hline
 \end{tabularx}
-\caption{Resumen de las 10 métricas del benchmark del modelo híbrido tfm-slm: evaluación original (300.000 muestras con solape train/eval) frente a la evaluación corregida (148.437 muestras del split disjunto, ver Sección~\ref{subsec:benchmark_corregido}).}
+\caption{Resumen de las 10 métricas del benchmark del modelo híbrido tfm-slm: evaluación original (300.000 muestras con solape train/eval) frente a la evaluación corregida (148.437 muestras del split disjunto, ver Sección~\ref{subsec:benchmark_corregido}). $^{w}$Tamaño de los pesos del modelo en fp32; el \textit{checkpoint} de entrenamiento completo (\texttt{.output/checkpoint.pt}, con estado del optimizador incluido) ocupa $\approx$1,9 GB en disco.}
 \label{tab:benchmark_summary}
 \end{table}
 
